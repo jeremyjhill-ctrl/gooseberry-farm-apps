@@ -1,0 +1,85 @@
+{% extends "admin_base.html" %}
+{% block title %}Day sheet · {{ nice_date(day) }}{% endblock %}
+{% block body %}
+<section class="card">
+  <div class="row between">
+    <div>
+      <h1 style="font-size:26px">{{ nice_date(day, long=True) }}</h1>
+      <div class="row muted" style="gap:8px;margin-top:4px">
+        <span><b>{{ totals.groups }}</b> groups</span>·<span><b>{{ totals.tickets }}</b> people</span>{% if totals.under2 %}·<span><b>{{ totals.under2 }}</b> under 2</span>{% endif %}·<span><b>{{ totals.in }}</b> checked in</span>·<span>Max on the farm <b>{{ cap }}</b></span>
+      </div>
+    </div>
+    <div class="row noprint">
+      {% if prev_day %}<a class="btn ghost" href="{{ url_for('admin_day', date=prev_day) }}">‹ {{ nice_date(prev_day) }}</a>{% endif %}
+      <form method="get" class="row"><input type="date" name="date" value="{{ day }}" aria-label="Pick a day"><button class="btn ghost">Go</button></form>
+      {% if next_day %}<a class="btn ghost" href="{{ url_for('admin_day', date=next_day) }}">{{ nice_date(next_day) }} ›</a>{% endif %}
+      <button class="btn" type="button" onclick="window.print()">Print</button>
+    </div>
+  </div>
+  <form method="get" action="{{ url_for('admin_find') }}" class="row noprint">
+    <input type="hidden" name="date" value="{{ day }}">
+    <input type="search" name="q" placeholder="Find a guest: name, phone or code" aria-label="Find a guest" style="flex:1;min-width:220px;height:44px;border:1px solid #C9CEC0;border-radius:10px;padding:0 12px;font-size:16px">
+    <button class="btn ghost">Find</button>
+  </form>
+  <div class="row muted noprint" style="gap:14px;font-size:13px">
+    <span><span class="key" style="background:#fff;border-color:#9DB98A"></span> booked</span>
+    <span><span class="key" style="background:var(--tint);border-color:var(--green)"></span> checked in</span>
+    <span><span class="key" style="background:var(--amber);border-color:#E9D18A"></span> checking out now</span>
+    {% if is_today %}<span><span class="key" style="background:var(--red-tint);border-color:var(--red)"></span> window passed, not here yet</span>{% endif %}
+    <span>Each block runs the {{ S.stay_minutes }} minutes we assume a group stays.</span>
+  </div>
+</section>
+
+<section class="card cal-card">
+  <div class="scroll">
+  <div class="cal" style="grid-template-columns: 78px 64px repeat({{ lanes }}, minmax(150px, 1fr)); grid-template-rows: 28px repeat({{ rows|length }}, 34px);">
+    <div class="cal-h">Time</div><div class="cal-h">On farm</div><div class="cal-h" style="grid-column: 3 / span {{ lanes }}">Groups</div>
+    {% for r in rows %}
+      <div class="cal-t {{ 'hour' if r.hour }} {{ 'gap' if r.gap }} {{ 'after' if r.after }}" style="grid-row: {{ loop.index + 1 }}">{{ r.label }}{% if r.gap %}<small>break</small>{% endif %}</div>
+      <div class="cal-n {{ 'over' if r.over }} {{ 'hour' if r.hour }}" style="grid-row: {{ loop.index + 1 }}">{{ r.on_farm }}</div>
+      <div class="cal-line {{ 'hour' if r.hour }} {{ 'gap' if r.gap }}" style="grid-row: {{ loop.index + 1 }}; grid-column: 3 / span {{ lanes }}"></div>
+    {% endfor %}
+    {% for x in blocks %}
+      {% set b = x.b %}
+      <div class="cal-b {{ 'in' if b.checked_in }} {{ 'held' if b.status == 'held' }} {{ 'late' if x.late }}" style="grid-row: {{ x.row }} / span {{ x.span }}; grid-column: {{ x.lane + 3 }}">
+        <div class="row between" style="gap:6px;flex-wrap:nowrap">
+          {% if b.status == 'paid' %}<a href="{{ url_for('staff_checkin', code=b.code) }}" style="font-weight:800;color:var(--ink)">{{ b.name }}</a>{% else %}<b>Checking out…</b>{% endif %}<b class="cal-tix">{{ b.tickets }}</b>
+        </div>
+        <div class="muted">{{ window_label(b.window_start) }}{% if b.under2 %} · +{{ b.under2 }} under 2{% endif %}</div>
+        {% if b.phone %}<div class="muted">{{ b.phone }}</div>{% endif %}
+        {% if x.late %}<div style="color:var(--red);font-weight:800;font-size:13px">Window passed</div>{% endif %}
+        {% if b.status == 'paid' %}
+        <form method="post" action="{{ url_for('admin_checkin', bid=b.id) }}" class="noprint" style="margin-top:auto">
+          <input type="hidden" name="date" value="{{ day }}"><input type="hidden" name="back" value="day">
+          <button class="btn {{ 'ghost' if b.checked_in }}" style="min-height:34px;padding:0 10px;font-size:13px">{{ '✓ Checked in' if b.checked_in else 'Check in' }}</button>
+        </form>
+        {% endif %}
+        {% if b.demo %}
+        <form method="post" action="{{ url_for('admin_remove', bid=b.id) }}" class="noprint">
+          <input type="hidden" name="back" value="day">
+          <button class="btn ghost" style="min-height:30px;padding:0 8px;font-size:12px">Remove pretend group</button>
+        </form>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  </div>
+  {% if not blocks %}<p class="muted" style="margin:0">No bookings on this day yet.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Gate list</h2>
+  <div class="scroll"><table>
+    <thead><tr><th class="printonly" style="width:32px">✓</th><th>Arrival window</th><th>Name</th><th class="num">People</th><th class="num">Under 2</th><th>Phone</th><th>Code</th><th class="noprint">Status</th></tr></thead>
+    <tbody>
+    {% for b in bookings %}
+      <tr><td class="printonly"><span class="box"></span></td>
+        <td>{{ window_label(b.window_start) }}</td><td><b>{{ b.name or '(checking out)' }}</b></td>
+        <td class="num"><b>{{ b.tickets }}</b></td><td class="num">{{ b.under2 or '' }}</td><td>{{ b.phone or '' }}</td><td class="muted">{{ b.code }}</td>
+        <td class="noprint">{% if b.checked_in %}<span class="tag in">checked in</span>{% elif b.status == 'held' %}<span class="tag held">checking out</span>{% else %}<span class="tag">expected</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">No bookings.</td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><td class="printonly"></td><td><b>Total</b></td><td></td><td class="num"><b>{{ totals.tickets }}</b></td><td class="num"><b>{{ totals.under2 or '' }}</b></td><td colspan="3"></td></tr></tfoot>
+  </table></div>
+</section>
+{% endblock %}

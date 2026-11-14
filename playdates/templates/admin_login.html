@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block heading %}Playdate admin{% endblock %}
+{% block body %}
+<form method="post" class="card">
+  <h1 style="font-size:24px">Sign in</h1>
+  <label>Password <input type="password" name="password" autofocus></label>
+  <button class="btn">Sign in</button>
+  <p class="muted" style="margin:0">Test version password: <strong>playdate</strong>. The real app will use a strong password of your choosing.</p>
+</form>
+{% endblock %}

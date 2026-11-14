@@ -1,0 +1,231 @@
+{% extends "admin_base.html" %}
+{% block title %}Reports{% endblock %}
+{% macro dollars(x) %}${{ "{:,.0f}".format(x or 0) }}{% endmacro %}
+{% macro change(v, prev_year) %}{% if v is none %}<span class="chg flat">first year</span>{% elif v >= 0.5 %}<span class="chg up">▲ {{ "%.0f"|format(v) }}% vs {{ prev_year }}</span>{% elif v <= -0.5 %}<span class="chg down">▼ {{ "%.0f"|format(-v) }}% vs {{ prev_year }}</span>{% else %}<span class="chg flat">same as {{ prev_year }}</span>{% endif %}{% endmacro %}
+{% block body %}
+<style>
+  .rep-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .rep-head h1{font-size:26px;margin:0}
+  .through{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}
+  .through input{height:40px;border:1px solid #C9CEC0;border-radius:10px;padding:0 10px;font:inherit}
+  .through a.on{font-weight:800;color:var(--ink);text-decoration:none}
+  .years{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .yr{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#fff}
+  .yr.now{border:2px solid var(--green);background:#FBFDF8}
+  .yr-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .yr-top b{font-size:22px}
+  .tag{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;text-align:right}
+  .stat{display:grid;grid-template-columns:1fr auto;align-items:baseline;row-gap:2px}
+  .stat .lbl{font-size:13px;color:var(--muted)}
+  .stat .val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+  .stat .chg{grid-column:1 / -1;text-align:right}
+  .chg{font-size:12.5px;font-weight:700;white-space:nowrap}
+  .chg.up{color:#1F6B35}.chg.down{color:var(--red)}.chg.flat{color:var(--muted);font-weight:600}
+  .seg{display:inline-flex;border:1px solid #C9CEC0;border-radius:10px;overflow:hidden}
+  .seg button{border:0;background:#fff;font:inherit;font-size:14px;font-weight:700;padding:8px 14px;cursor:pointer;color:var(--muted)}
+  .seg button[aria-pressed="true"]{background:var(--green);color:#fff}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:var(--ink)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{display:inline-block;width:18px;height:0;border-top:3px solid;border-radius:2px}
+  #chart{position:relative}
+  #chart svg{display:block;width:100%;height:auto}
+  #tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.08);padding:8px 10px;font-size:13px;display:none;min-width:150px}
+  #tip b{display:block;margin-bottom:4px}
+  #tip div{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+  .mtable td,.mtable th{font-variant-numeric:tabular-nums}
+  .mtable tr.yrow td{font-weight:800;border-top:2px solid var(--line)}
+  .mtable tr.mrow td:first-child{padding-left:30px}
+  .mtable tr.drow td{font-size:14px;color:var(--muted)}
+  .mtable tr.drow td:first-child{padding-left:52px}
+  .mtable tr[hidden]{display:none}
+  .exp{border:0;background:none;font:inherit;font-weight:inherit;cursor:pointer;padding:0;display:inline-flex;gap:8px;align-items:center;color:inherit}
+  .exp .car{display:inline-block;width:12px;transition:transform .15s;color:var(--muted)}
+  .exp[aria-expanded="true"] .car{transform:rotate(90deg)}
+</style>
+
+<section class="card">
+  <div class="rep-head">
+    <div>
+      <h1>Playdates: how this spring compares</h1>
+      <p class="muted" style="margin:4px 0 0">{% if full %}Full seasons, side by side.{% else %}Each spring from March 1 through <b>{{ through_label }}</b>, so every year is measured to the same point on the calendar.{% endif %}</p>
+    </div>
+    <form class="through" method="get">
+      <label for="through">Compare through</label>
+      <input type="date" id="through" name="through" value="{{ through_value }}">
+      <button class="btn ghost" style="min-height:40px">Show</button>
+      <a href="{{ url_for('admin_reports') }}" class="{{ 'on' if not request.args.get('through') }}">Today</a> ·
+      <a href="{{ url_for('admin_reports', through=season_year ~ '-12-31') }}" class="{{ 'on' if full and request.args.get('through') }}">Full season</a>
+    </form>
+  </div>
+  <div class="years">
+    {% for y in years %}
+    {% set prev = years[loop.index] if loop.index < years|length else none %}
+    <div class="yr {{ 'now' if y.source == 'app' }}">
+      <div class="yr-top"><b>{{ y.year }}</b><span class="tag">{{ 'this app' if y.source == 'app' else 'from Square' }}{{ ' · includes test bookings' if y.demo }}</span></div>
+      <div class="stat"><span class="lbl">Groups</span><span class="val">{{ "{:,}".format(y.todate.groups|int) }}</span>{{ change(y.vs.groups, prev.year if prev else '') }}</div>
+      <div class="stat"><span class="lbl">Additional people</span><span class="val">{{ "{:,}".format(y.todate.extra|int) }}</span>{{ change(y.vs.extra, prev.year if prev else '') }}</div>
+      <div class="stat"><span class="lbl">Revenue</span><span class="val">{{ dollars(y.todate.revenue) }}</span>{{ change(y.vs.revenue, prev.year if prev else '') }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted" style="margin:0;font-size:13px">Counted by the day each sale was paid, the same way Square's reports count. <b>Groups</b> = $70 playdate packages sold. <b>Additional people</b> = $10 tickets for people beyond the package's 5, sold on playdate days. Large groups are left out. <b>Revenue</b> is before sales tax.</p>
+</section>
+
+<section class="card">
+  <div class="row between" style="align-items:center">
+    <h2 style="margin:0">Running total through the season</h2>
+    <div class="seg" role="group" aria-label="What to chart">
+      <button type="button" data-k="revenue" aria-pressed="true">Revenue</button>
+      <button type="button" data-k="groups" aria-pressed="false">Groups</button>
+      <button type="button" data-k="extra" aria-pressed="false">Additional people</button>
+    </div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div id="chart"><div id="tip" role="status"></div></div>
+  <p class="muted" style="margin:0;font-size:13px">Each line adds up a spring's sales day by day, by the day they were paid. A steeper line means a busier stretch. Hover or tap to compare years on the same date. The month table below has every number.</p>
+</section>
+
+<section class="card">
+  <h2>Season by month</h2>
+  <p class="muted" style="margin:-6px 0 0;font-size:14px">Tap a year to see its months, and a month to see its days.</p>
+  <div class="scroll"><table class="mtable">
+    <thead><tr><th></th><th class="num">Groups</th><th class="num">Additional people</th><th class="num">Revenue</th><th class="num">Revenue vs year before</th></tr></thead>
+    <tbody>
+    {% for y in years %}
+      {% set prev = years[loop.index] if loop.index < years|length else none %}
+      <tr class="yrow"><td><button class="exp" aria-expanded="false" data-open="y{{ y.year }}"><span class="car">▸</span>{{ y.year }} season{{ ' (this app)' if y.source == 'app' }}</button></td>
+        <td class="num">{{ "{:,}".format(y.total.groups|int) }}</td><td class="num">{{ "{:,}".format(y.total.extra|int) }}</td><td class="num">{{ dollars(y.total.revenue) }}</td>
+        <td class="num">{% if prev and prev.total.revenue %}{{ change((y.total.revenue - prev.total.revenue) / prev.total.revenue * 100, prev.year) }}{% else %}<span class="chg flat">—</span>{% endif %}</td></tr>
+      {% if y.big_left_out or y.nonplay_left_out %}<tr class="mrow" data-in="y{{ y.year }}" data-year="y{{ y.year }}" hidden><td colspan="5" class="muted" style="font-size:13px">Left out of {{ y.year }}: {% if y.big_left_out %}{{ y.big_left_out }} $10 tickets in single sales of more than 10 people{% endif %}{% if y.big_left_out and y.nonplay_left_out %}, and {% endif %}{% if y.nonplay_left_out %}{{ y.nonplay_left_out }} sold on days with no playdates scheduled{% endif %}.</td></tr>{% endif %}
+      {% for m in y.months %}
+      <tr class="mrow" data-in="y{{ y.year }}" data-year="y{{ y.year }}" hidden><td><button class="exp" aria-expanded="false" data-open="m{{ m.key }}"><span class="car">▸</span>{{ m.label }}</button></td>
+        <td class="num">{{ m.groups|int }}</td><td class="num">{{ m.extra|int }}</td><td class="num">{{ dollars(m.revenue) }}</td>
+        <td class="num">{% if m.vs is defined and m.vs is not none %}{{ change(m.vs, prev.year) }}{% else %}<span class="chg flat">—</span>{% endif %}</td></tr>
+        {% for d in m.days %}
+        <tr class="drow" data-in="m{{ m.key }}" data-year="y{{ y.year }}" hidden><td>{{ nice_date(d.date) }}</td><td class="num">{{ d.groups|int }}</td><td class="num">{{ (d.extra or 0)|int }}</td><td class="num">{{ dollars(d.revenue) }}</td><td></td></tr>
+        {% endfor %}
+      {% endfor %}
+    {% else %}
+      <tr><td colspan="5" class="muted">No history yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if note %}<p class="muted" style="margin:0;font-size:13px">{{ note }}</p>{% endif %}
+</section>
+
+<section class="card">
+  <div class="row between"><h2>This app: sales by day</h2><a class="btn ghost" href="{{ url_for('admin_reports_csv') }}">Download CSV</a></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Day</th><th class="num">Groups</th><th class="num">People</th><th class="num">Added at gate</th><th class="num">Sales</th><th class="num">Sales tax</th><th class="num">Collected</th></tr></thead>
+    <tbody>
+    {% for r in rows %}<tr><td>{{ nice_date(r.date) }}</td><td class="num">{{ r.groups }}</td><td class="num">{{ r.tickets }}</td><td class="num">{{ r.gate }}</td><td class="num">{{ money(r.sub) }}</td><td class="num">{{ money(r.tax) }}</td><td class="num"><b>{{ money(r.total) }}</b></td></tr>
+    {% else %}<tr><td colspan="7" class="muted">No sales yet.</td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><td><b>Season</b></td><td class="num"><b>{{ tot.groups }}</b></td><td class="num"><b>{{ tot.tickets }}</b></td><td class="num"><b>{{ tot.gate }}</b></td><td class="num"><b>{{ money(tot.sub) }}</b></td><td class="num"><b>{{ money(tot.tax) }}</b></td><td class="num"><b>{{ money(tot.total) }}</b></td></tr></tfoot>
+  </table></div>
+  <p class="muted" style="margin:0">"Sales tax" is what you'll report and send to the Missouri Department of Revenue for these sales.</p>
+</section>
+
+<script>
+(function () {
+  document.querySelectorAll(".exp").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var open = b.getAttribute("aria-expanded") !== "true", id = b.dataset.open;
+      b.setAttribute("aria-expanded", open);
+      document.querySelectorAll('[data-in="' + id + '"]').forEach(function (r) { r.hidden = !open; });
+      if (!open && id[0] === "y") {  // closing a year closes its months and days too
+        document.querySelectorAll('tr.drow[data-year="' + id + '"]').forEach(function (r) { r.hidden = true; });
+        document.querySelectorAll('tr.mrow[data-year="' + id + '"] .exp').forEach(function (x) { x.setAttribute("aria-expanded", "false"); });
+      }
+    });
+  });
+
+  var C = {{ chart|tojson }};
+  var colors = ["#2a78d6", "#eb6834", "#1baf7a"];  // newest first; older years are dashed gray
+  C.series.forEach(function (s, i) { s.color = colors[i] || "#8C9189"; s.dash = i >= colors.length; s.w = i === 0 ? 3 : 2; });
+  var key = "revenue", box = document.getElementById("chart"), tip = document.getElementById("tip");
+  var W = 920, H = 340, L = 64, R = 56, T = 16, B = 34, NS = "http://www.w3.org/2000/svg";
+  function el(n, a) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); return e; }
+  function fmt(v) { return key === "revenue" ? "$" + Math.round(v).toLocaleString() : Math.round(v).toLocaleString(); }
+  function mdLabel(md) { return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+md.slice(0,2)-1] + " " + (+md.slice(3)); }
+  function nice(max) { var p = Math.pow(10, Math.floor(Math.log10(max || 1))), n = max / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; }
+
+  var lg = document.getElementById("legend");
+  C.series.forEach(function (s) {
+    var sp = document.createElement("span"), i = document.createElement("i");
+    i.style.borderTopColor = s.color; if (s.dash) i.style.borderTopStyle = "dashed";
+    sp.appendChild(i); sp.appendChild(document.createTextNode(s.year + (s.app ? " (this app)" : "")));
+    lg.appendChild(sp);
+  });
+
+  function draw() {
+    var old = box.querySelector("svg"); if (old) old.remove();
+    var n = C.axis.length, max = 0;
+    C.series.forEach(function (s) { var p = s.pts[key]; if (p.length) max = Math.max(max, p[p.length - 1]); });
+    var top = nice(max * 1.05);
+    var x = function (i) { return L + (W - L - R) * i / Math.max(1, n - 1); }, y = function (v) { return T + (H - T - B) * (1 - v / top); };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Running total by date, one line per year" });
+    for (var g = 0; g <= 4; g++) {
+      var v = top * g / 4, yy = y(v);
+      svg.appendChild(el("line", { x1: L, x2: W - R, y1: yy, y2: yy, stroke: g ? "#ECEDE6" : "#C9CEC0", "stroke-width": 1 }));
+      var t = el("text", { x: L - 8, y: yy + 4, "text-anchor": "end", "font-size": 12, fill: "#4F5A51" }); t.textContent = fmt(v); svg.appendChild(t);
+    }
+    C.axis.forEach(function (md, i) {
+      if (md.slice(3) === "01" || i === 0) {
+        var t = el("text", { x: x(i), y: H - 10, "font-size": 12, fill: "#4F5A51", "text-anchor": i === 0 ? "start" : "middle" });
+        t.textContent = mdLabel(md); svg.appendChild(t);
+      }
+    });
+    if (!C.full) {
+      var ti = C.axis.indexOf(C.through);
+      if (ti >= 0) {
+        svg.appendChild(el("line", { x1: x(ti), x2: x(ti), y1: T, y2: H - B, stroke: "#1E2A20", "stroke-dasharray": "3 4", "stroke-width": 1 }));
+        var tt = el("text", { x: x(ti) + 5, y: T + 11, "font-size": 12, fill: "#1E2A20", "font-weight": 700 }); tt.textContent = mdLabel(C.through); svg.appendChild(tt);
+      }
+    }
+    var ends = [];
+    C.series.slice().reverse().forEach(function (s) {  // oldest first so the newest sits on top
+      var p = s.pts[key]; if (!p.length) return;
+      var d = p.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join("");
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: "#fff", "stroke-width": s.w + 3, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: s.color, "stroke-width": s.w, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": s.dash ? "6 5" : "none" }));
+      ends.push({ s: s, x: x(p.length - 1), cy: y(p[p.length - 1]), y: y(p[p.length - 1]) });
+    });
+    ends.sort(function (a, b) { return a.y - b.y; });  // keep end labels from colliding
+    for (var k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 15) ends[k].y = ends[k - 1].y + 15;
+    ends.forEach(function (e) {
+      svg.appendChild(el("circle", { cx: e.x, cy: e.cy, r: 4, fill: e.s.color, stroke: "#fff", "stroke-width": 2 }));
+      var t = el("text", { x: e.x + 8, y: e.y + 4, "font-size": 12.5, "font-weight": 800, fill: "#1E2A20" }); t.textContent = e.s.year; svg.appendChild(t);
+    });
+    var cross = el("line", { y1: T, y2: H - B, stroke: "#1E2A20", "stroke-width": 1, opacity: 0 }); svg.appendChild(cross);
+    var dots = C.series.map(function (s) { var c = el("circle", { r: 5, fill: s.color, stroke: "#fff", "stroke-width": 2, opacity: 0 }); svg.appendChild(c); return c; });
+    var hit = el("rect", { x: L - 10, y: 0, width: W - L - R + 20, height: H, fill: "transparent" }); svg.appendChild(hit);
+    function move(ev) {
+      var r = svg.getBoundingClientRect(), px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      var i = Math.max(0, Math.min(n - 1, Math.round((px * W / r.width - L) / (W - L - R) * (n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", .35);
+      var html = "<b>Through " + mdLabel(C.axis[i]) + "</b>";
+      C.series.forEach(function (s, j) {
+        var p = s.pts[key], v = p.length ? p[Math.min(i, p.length - 1)] : 0;
+        dots[j].setAttribute("cx", x(Math.min(i, Math.max(0, p.length - 1)))); dots[j].setAttribute("cy", y(v)); dots[j].setAttribute("opacity", p.length ? 1 : 0);
+        html += '<div><span><span style="display:inline-block;width:10px;height:3px;background:' + s.color + ';vertical-align:middle;margin-right:6px"></span>' + s.year + "</span><span>" + fmt(v) + "</span></div>";
+      });
+      tip.innerHTML = html; tip.style.display = "block";
+      var tx = x(i) * r.width / W; tip.style.left = Math.max(4, Math.min(r.width - tip.offsetWidth - 4, tx + 14)) + "px"; tip.style.top = "8px";
+    }
+    function out() { tip.style.display = "none"; cross.setAttribute("opacity", 0); dots.forEach(function (d) { d.setAttribute("opacity", 0); }); }
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("touchstart", move, { passive: true });
+    hit.addEventListener("mouseleave", out);
+    box.insertBefore(svg, tip);
+  }
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      key = b.dataset.k;
+      document.querySelectorAll(".seg button").forEach(function (o) { o.setAttribute("aria-pressed", o === b); });
+      draw();
+    });
+  });
+  draw();
+})();
+</script>
+{% endblock %}

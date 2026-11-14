@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Your booking{% endblock %}
+{% block body %}
+<section class="card">
+  <h1 style="font-size:24px">Your playdate</h1>
+  <div style="font-weight:800">{{ nice_date(b.date, long=True) }} · arrival window {{ window_label(b.window_start) }}</div>
+  <div>{{ desc }} · Paid {{ money(paid.total) }}</div>
+  <div class="muted">Code {{ b.code }}</div>
+  <div class="muted">{{ S.policy_short }}</div>
+  {% if b.weather_moved %}<div class="warn">We had to close that day. Your ticket is still good. Pick any open day below.</div>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Add people to your ticket</h2>
+  <p style="margin:0;font-size:14px">Everyone age 2 and up must be on your ticket, watchers included.</p>
+  <form method="post" action="{{ url_for('add_tickets', code=b.code) }}" class="row">
+    {% for a in add_preview %}
+      <button class="btn ghost" name="add" value="{{ a.n }}">+{{ a.n }} · {{ money(a.price) }}</button>
+    {% endfor %}
+  </form>
+  <p class="muted" style="margin:0">Prices before tax.</p>
+</section>
+
+<section class="card">
+  <h2>Change my day or time</h2>
+  {% if not can_move %}
+    <p class="muted" style="margin:0">Online changes close {{ S.reschedule_cutoff_hours }} hours before your arrival window. Tickets aren't refunded, and changes after that are up to the farm, so please call or text us.</p>
+  {% else %}
+    <div class="days">
+      {% for d in dates %}<a class="day {% if d.date == move_date %}on{% endif %}" href="{{ url_for('manage', code=b.code, move_date=d.date) }}"><small>{{ nice_date(d.date)[:3] }}</small><b>{{ d.date[8:]|int }}</b><small>{{ nice_date(d.date)[5:8] }}</small></a>{% endfor %}
+    </div>
+    {% for h in hours %}
+      <b>{{ h.label }}</b>
+      <div class="slots">
+        {% for sl in h.slots %}
+          <form method="post" action="{{ url_for('move', code=b.code) }}">
+            <input type="hidden" name="date" value="{{ move_date }}"><input type="hidden" name="start" value="{{ sl.start }}">
+            <button class="slot" {% if not sl.ok %}disabled{% endif %}>{{ sl.label }}</button>
+          </form>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    {% if not move_date %}<p class="muted" style="margin:0">Pick a day to see open arrival windows.</p>{% endif %}
+  {% endif %}
+</section>
+{% endblock %}

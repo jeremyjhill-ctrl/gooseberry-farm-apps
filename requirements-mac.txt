@@ -1,0 +1,3 @@
+# Used on the Mac for testing (Python 3.9 there, so these are left flexible).
+Flask>=3.0
+qrcode>=7.4

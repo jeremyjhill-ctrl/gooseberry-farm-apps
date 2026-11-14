@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Payment{% endblock %}
+{% block heading %}Checkout{% endblock %}
+{% block body %}
+<div class="test">TEST MODE · Stand-in for Stripe · No real card is charged</div>
+<div class="paybox">
+  <div class="muted">Gooseberry Bridge Farm</div>
+  <div style="font-size:30px;font-weight:700">{{ money(total) }}</div>
+  <div>{{ label }}</div>
+  <div class="sum" style="font-size:14px">
+    <div><span>Subtotal</span><span>{{ money(sub) }}</span></div>
+    <div><span>Sales tax{% if S.tax_mode == 'included' %} (included){% endif %}</span><span>{{ money(tax) }}</span></div>
+  </div>
+  {% if error %}<div class="flash" style="border-color:var(--red)">{{ error }}</div>{% endif %}
+  <form method="post" style="display:flex;flex-direction:column;gap:12px">
+    <label>Card number <input type="text" name="card" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" required></label>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <label>Expiry <input type="text" name="exp" placeholder="12 / 30"></label>
+      <label>CVC <input type="text" name="cvc" placeholder="123"></label>
+    </div>
+    <button class="btn big" style="background:#635BFF;border-color:#635BFF">Pay {{ money(total) }}</button>
+  </form>
+  <div class="muted">Test cards: <strong>4242 4242 4242 4242</strong> succeeds · <strong>4000 0000 0000 0002</strong> is declined.</div>
+</div>
+{% if not add %}<a href="{{ url_for('checkout', code=b.code) }}">‹ Back</a>{% else %}<a href="{{ url_for('manage', code=b.code) }}">‹ Back</a>{% endif %}
+{% endblock %}

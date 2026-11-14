@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Checkout{% endblock %}
+{% block body %}
+<a href="{{ url_for('book', date=b.date, tickets=b.tickets, under2=b.under2) }}" style="font-weight:700;text-decoration:none">‹ Change time or tickets</a>
+<div class="warn row between">
+  <span>We're holding <strong>{{ nice_date(b.date) }}, {{ window_label(b.window_start) }}</strong> for you.</span>
+  <strong id="clock" data-left="{{ seconds_left }}" style="font-size:18px;font-variant-numeric:tabular-nums"></strong>
+</div>
+{% for e in errors %}<div class="flash" style="border-color:var(--red)">{{ e }}</div>{% endfor %}
+
+<section class="card sum">
+  <h2>Your playdate</h2>
+  <div style="display:block">{{ nice_date(b.date, long=True) }}</div>
+  <div style="display:block;font-weight:800">Arrival window: {{ window_label(b.window_start) }}</div>
+  {% for label, amt in lines %}<div><span>{{ label }}</span><span>{{ money(amt) }}</span></div>{% endfor %}
+  {% if b.under2 %}<div><span>{{ b.under2 }} under 2 (free)</span><span>Free</span></div>{% endif %}
+  {% if S.tax_mode == 'added' %}<div><span>Sales tax ({{ S.tax_rate }}%)</span><span>{{ money(tax) }}</span></div>{% endif %}
+  <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
+  {% if S.tax_mode == 'included' %}<div class="muted"><span>Includes {{ money(tax) }} sales tax</span><span></span></div>{% endif %}
+</section>
+
+<div class="card" style="flex-direction:row;align-items:flex-start;gap:12px">
+  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17l1.5-5h9L18 17M7 17v2M17 17v2M8.5 12l1-3h5l1 3" fill="none" stroke="#2F5D3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span style="font-size:14px">We're a working farm and our parking is limited. Carpooling is greatly appreciated!</span>
+</div>
+
+<form method="post" class="card">
+  <h2>Your details</h2>
+  <label>Name <input type="text" name="name" autocomplete="name" value="{{ b.name or '' }}" required></label>
+  <label>Email <input type="email" name="email" autocomplete="email" value="{{ b.email or '' }}" required></label>
+  <label>Mobile phone <input type="tel" name="phone" autocomplete="tel" value="{{ b.phone or '' }}" placeholder="(417) 555-0123"></label>
+  <label class="inline"><input type="checkbox" name="sms_ok" {% if b.sms_ok is none or b.sms_ok %}checked{% endif %}> <span>Text me my confirmation and a reminder the day before. Reply STOP anytime.</span></label>
+  <h2 style="margin-top:8px">Ticket policy</h2>
+  {% for para in policy %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}
+  <label class="inline"><input type="checkbox" name="agree" required> <span><strong>I agree to the ticket policy</strong></span></label>
+  <button class="btn big">Continue to payment</button>
+</form>
+<script>
+(function(){var el=document.getElementById('clock');var s=+el.dataset.left;function t(){var m=Math.floor(s/60),x=s%60;el.textContent=m+':'+(x<10?'0':'')+x;if(s<=0){location.reload();return}s--;}t();setInterval(t,1000);})();
+</script>
+{% endblock %}

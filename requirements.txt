@@ -1,0 +1,9 @@
+# Used on Render. Pinned to the versions the safety checks were actually run against,
+# so the server never quietly installs something different from what was tested.
+Flask==3.1.3
+Werkzeug==3.1.9
+qrcode==8.2
+stripe==17.0.0
+gunicorn==27.0.1
+psycopg[binary]==3.3.9
+boto3==1.44.3

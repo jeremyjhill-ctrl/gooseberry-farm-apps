@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+{% block title %}Find a booking{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<form method="get" class="card">
+  <h2>Find a booking</h2>
+  <p class="muted" style="margin:0">For guests who can't pull up their ticket. Search by last name, phone number or confirmation code.</p>
+  <input type="hidden" name="date" value="{{ day }}">
+  <div class="row"><input type="search" name="q" value="{{ q }}" placeholder="Miller, 555-0123 or code" autofocus style="flex:1;height:46px;border:1px solid #C9CEC0;border-radius:10px;padding:0 12px;font-size:16px"><button class="btn">Search</button></div>
+</form>
+{% if q %}
+<section class="card">
+  {% for b in rows %}
+    <a href="{{ url_for('staff_checkin', code=b.code) }}" class="row between" style="text-decoration:none;color:inherit;padding:10px 0;border-bottom:1px solid #EEEFE8">
+      <div><b>{{ b.name }}</b> {% if b.checked_in %}<span class="tag in">checked in</span>{% endif %}
+        <div class="muted">{{ nice_date(b.date) }} · {{ window_label(b.window_start) }} · {{ b.phone or '' }}</div></div>
+      <b style="font-size:20px">{{ b.tickets }}</b>
+    </a>
+  {% else %}<p class="muted" style="margin:0">No paid bookings match "{{ q }}".</p>{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

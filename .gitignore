@@ -1,0 +1,8 @@
+.venv/
+data/
+backups/
+__pycache__/
+*.db
+.DS_Store
+.server-db-url
+_pending/

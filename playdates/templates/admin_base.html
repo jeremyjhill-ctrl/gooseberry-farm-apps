@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block heading %}Playdate admin{% endblock %}
+{% block wrapclass %}{% endblock %}
+{% block nav %}
+<nav aria-label="Admin">
+  {% set p = request.path %}
+  <a href="{{ url_for('admin_home') }}" class="{{ 'on' if p == '/admin' }}">Today</a>
+  <a href="{{ url_for('admin_calendar') }}" class="{{ 'on' if p.startswith('/admin/calendar') }}">Calendar</a>
+  <a href="{{ url_for('admin_day') }}" class="{{ 'on' if p.startswith('/admin/day') and not p.startswith('/admin/days') }}">Day sheet</a>
+  <a href="{{ url_for('admin_find') }}" class="{{ 'on' if p.startswith('/admin/find') or p.startswith('/admin/checkin') }}">Check-in</a>
+  <a href="{{ url_for('admin_bookings') }}" class="{{ 'on' if p.startswith('/admin/bookings') }}">Bookings</a>
+  <a href="{{ url_for('admin_settings') }}" class="{{ 'on' if p.startswith('/admin/settings') }}">Pricing &amp; schedule</a>
+  <a href="{{ url_for('admin_messages') }}" class="{{ 'on' if p.startswith('/admin/messages') }}">Messages</a>
+  <a href="{{ url_for('admin_reports') }}" class="{{ 'on' if p.startswith('/admin/reports') }}">Reports</a>
+  <a href="{{ url_for('book') }}">Guest page ↗</a>
+</nav>
+{% endblock %}

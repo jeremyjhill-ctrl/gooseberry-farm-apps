@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Book a playdate{% endblock %}
+{% block body %}
+<p class="muted" style="margin:0">Spring {{ S.season_start[:4] }} · Rogersville, MO</p>
+
+<section class="card" id="days">
+  <h2>1. Pick a day</h2>
+  {% if not dates %}<div class="note">New playdate dates are released a few weeks at a time, and they go fast! Follow us on Facebook and Instagram so you're the first to know when the next dates open.</div>{% endif %}
+  <div class="days">
+    {% for d in dates %}
+      {% set day = d.date %}
+      <a data-live class="day {% if day == chosen %}on{% elif not d.open %}full{% endif %}" href="{{ url_for('book', date=day, tickets=tickets, under2=under2) }}" {% if not d.open %}title="{{ d.why }}"{% endif %}>
+        <small>{{ nice_date(day)[:3] }}</small><b>{{ day[8:]|int }}</b><small>{{ nice_date(day)[5:8] }}</small>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card" id="who">
+  <h2>2. Who's coming?</h2>
+  <p style="margin:0;font-size:14px">Your group gets one ticket, and <strong>everyone age 2 and up who comes onto the farm must be on it</strong>, even if they're just watching. It keeps the babies calm and gives every family room to enjoy them.</p>
+  <div>
+    <div class="stepper">
+      <div><b>People age 2 and up</b><div class="muted">Everyone coming, grown-ups too</div></div>
+      <div class="step">
+        <a data-live aria-label="One fewer person" href="{{ url_for('book', date=chosen, tickets=[tickets-1,1]|max, under2=under2) }}">−</a>
+        <b>{{ '%d+'|format(biggest) if too_big else tickets }}</b>
+        {% if too_big %}<a class="plus off" aria-disabled="true" aria-label="Larger groups: please contact us">+</a>
+        {% else %}<a data-live class="plus" aria-label="One more person" href="{{ url_for('book', date=chosen, tickets=tickets+1, under2=under2) }}">+</a>{% endif %}
+      </div>
+    </div>
+    <div class="stepper">
+      <div><b>Little ones under 2</b><div class="muted">Free, and they don't count</div></div>
+      <div class="step">
+        <a data-live aria-label="One fewer little one" href="{{ url_for('book', date=chosen, tickets=tickets, under2=[under2-1,0]|max) }}">−</a>
+        <b>{{ under2 }}</b>
+        <a data-live class="plus" aria-label="One more little one" href="{{ url_for('book', date=chosen, tickets=tickets, under2=under2+1) }}">+</a>
+      </div>
+    </div>
+  </div>
+  {% if too_big %}<div class="biggroup" role="alert"><b>Larger group?</b> {{ big_message }}</div>
+  {% else %}<div class="note">{{ rule }}</div>{% endif %}
+</section>
+
+<section class="card" id="times">
+  <h2>3. Pick an arrival time{% if chosen %} for {{ nice_date(chosen) }}{% endif %}</h2>
+  <p style="margin:0;font-size:14px">Each time is a <strong>{{ S.window_minutes }}-minute arrival window</strong>. Please arrive within yours. Spacing out arrivals keeps the babies calm and gives every family room. Once you're here, stay as long as you like.</p>
+  {% if too_big %}<p class="muted" style="margin:0">Arrival times for groups over {{ biggest }} are arranged with us directly. Tap − to go back to {{ biggest }} or fewer.</p>
+  {% elif closed_reason %}<div class="warn">{{ closed_reason }}</div>{% endif %}
+  {% for h in hours %}
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <b>{{ h.label }}</b>
+      <div class="slots">
+        {% for sl in h.slots %}
+          <form method="post" action="{{ url_for('hold') }}">
+            <input type="hidden" name="date" value="{{ chosen }}"><input type="hidden" name="start" value="{{ sl.start }}">
+            <input type="hidden" name="tickets" value="{{ tickets }}"><input type="hidden" name="under2" value="{{ under2 }}">
+            <button class="slot" {% if not sl.ok %}disabled aria-label="{{ sl.label }}: {{ sl.why }}"{% endif %}>{{ sl.label }}</button>
+          </form>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  {% if chosen and not closed_reason and not hours and not too_big %}<p class="muted">No arrival times are set up for this day.</p>{% endif %}
+</section>
+
+<section class="card sum" id="summary" aria-live="polite">
+  {% if too_big %}<p class="muted" style="margin:0">Groups over {{ biggest }} people are priced and scheduled with us directly.</p>{% else %}
+  {% for label, amt in lines %}<div><span>{{ label }}</span><span>{{ money(amt) }}</span></div>{% endfor %}
+  {% if under2 %}<div><span>{{ under2 }} under 2 (free)</span><span>Free</span></div>{% endif %}
+  {% if S.tax_mode == 'added' and tax %}<div class="muted"><span>Sales tax ({{ S.tax_rate }}%)</span><span>{{ money(tax) }}</span></div>{% endif %}
+  <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
+  <p class="muted" style="margin:0">Tap a time above to hold it for {{ S.hold_minutes }} minutes while you check out.</p>
+  {% endif %}
+</section>
+<p class="muted" style="text-align:center"><a href="{{ url_for('admin_home') }}">Farm admin</a></p>
+<script>
+// Update tickets, days, times and price in place instead of reloading the page,
+// so you stay where you were scrolled. Without JavaScript the links still work as plain page loads.
+(function () {
+  var busy = false;
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-live]');
+    if (!a || busy || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    busy = true;
+    var label = a.getAttribute('aria-label');
+    var strip = document.querySelector('#days .days');
+    var stripLeft = strip ? strip.scrollLeft : 0, y = window.scrollY;
+    fetch(a.href, { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        ['days', 'who', 'times', 'summary'].forEach(function (id) {
+          var fresh = doc.getElementById(id), old = document.getElementById(id);
+          if (fresh && old) old.replaceWith(fresh);
+        });
+        var newStrip = document.querySelector('#days .days');
+        if (newStrip) newStrip.scrollLeft = stripLeft;
+        window.scrollTo(0, y);
+        history.replaceState(null, '', a.href);
+        if (label) { var again = document.querySelector('a[aria-label="' + label + '"]'); if (again) again.focus({ preventScroll: true }); }
+      })
+      .catch(function () { window.location = a.href; })
+      .then(function () { busy = false; });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "admin_base.html" %}
+{% block title %}Pricing & schedule{% endblock %}
+{% block body %}
+<section class="card">
+  <h2>Start from a pricing preset</h2>
+  <form method="post" class="grid">
+    {% for key, p in presets.items() %}
+      <button class="btn ghost" name="preset" value="{{ key }}" style="flex-direction:column;align-items:flex-start;min-height:80px;padding:10px 14px;text-align:left">
+        <span>{{ p.name }}</span><span class="muted" style="font-weight:600">{{ p.blurb }}</span></button>
+    {% endfor %}
+  </form>
+</section>
+
+<form method="post" style="display:flex;flex-direction:column;gap:20px">
+<div class="row" style="align-items:flex-start;gap:20px">
+  <section class="card" style="flex:999 1 520px;min-width:0">
+    <h2>How you charge</h2>
+    <div class="grid">
+      <label>Reservation fee ($ per booking) <input type="number" step="0.01" name="booking_fee" value="{{ S.booking_fee }}"></label>
+      <label>Price per person ($) <input type="number" step="0.01" name="price_per_ticket" value="{{ S.price_per_ticket }}"></label>
+      <label>Small party: up to (people) <input type="number" name="small_max" value="{{ S.small_max }}"></label>
+      <label>Small party price ($) <input type="number" step="0.01" name="small_price" value="{{ S.small_price }}"></label>
+      <label>Family package: up to (people) <input type="number" name="package_max" value="{{ S.package_max }}"></label>
+      <label>Family package price ($) <input type="number" step="0.01" name="package_price" value="{{ S.package_price }}"></label>
+      <label>Each extra person over package ($) <input type="number" step="0.01" name="extra_price" value="{{ S.extra_price }}"></label>
+    </div>
+    <h2>Sales tax</h2>
+    <div class="grid">
+      <label>Tax rate (%) <input type="number" step="0.001" name="tax_rate" value="{{ S.tax_rate }}"></label>
+      <label>How tax shows
+        <select name="tax_mode"><option value="added" {{ 'selected' if S.tax_mode == 'added' }}>Added on top at checkout</option><option value="included" {{ 'selected' if S.tax_mode == 'included' }}>Included in the price</option></select></label>
+    </div>
+    <div class="note"><strong>Guests will see:</strong> {{ rule }}</div>
+  </section>
+  <section class="card" style="flex:1 1 320px;min-width:0">
+    <h2>What each group pays</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>People</th><th class="num">Price</th><th class="num">Tax</th><th class="num">Total</th><th class="num">Per person</th></tr></thead>
+      <tbody>{% for r in table %}<tr><td>{{ r.n }}</td><td class="num">{{ money(r.sub) }}</td><td class="num">{{ money(r.tax) }}</td><td class="num"><b>{{ money(r.total) }}</b></td><td class="num muted">{{ money(r.per) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="muted" style="margin:0">Under 2 is free and doesn't count toward the limit. The table reflects saved settings.</p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Season &amp; hours</h2>
+  <div class="grid">
+    <label>Season starts <input type="date" name="season_start" value="{{ S.season_start }}"></label>
+    <label>Season ends <input type="date" name="season_end" value="{{ S.season_end }}"></label>
+  </div>
+  <p class="muted" style="margin:0">Guests only see days you release on the <a href="{{ url_for('admin_calendar') }}">Calendar</a>. Below are each weekday's usual hours. Check the days you usually open; "Release through" on the Calendar picks those. You can still change any single day's hours on the Calendar.</p>
+  <div class="scroll"><table style="max-width:560px">
+    <thead><tr><th>Usually open</th><th>First arrival</th><th>Close (last window ends)</th></tr></thead>
+    <tbody>
+    {% for d in weekdays %}{% set wh = (S.weekday_hours or {}).get(d) %}
+      <tr><td><label class="inline" style="align-items:center"><input type="checkbox" name="day_{{ d }}" {{ 'checked' if d in S.open_days }}> {{ d }}</label></td>
+        <td><input type="time" name="wh_start_{{ d }}" value="{{ wh[0] if wh else S.first_arrival }}"></td>
+        <td><input type="time" name="wh_end_{{ d }}" value="{{ wh[1] if wh else S.close_time }}"></td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <h2>Keeping it from getting crowded</h2>
+  <div class="grid">
+    <label>Arrival window length (minutes) <input type="number" name="window_minutes" value="{{ S.window_minutes }}"></label>
+    <label>Groups per arrival window <input type="number" name="groups_per_window" value="{{ S.groups_per_window }}"></label>
+    <label>Leave an empty window after every (windows, 0 = never) <input type="number" name="gap_every" value="{{ S.gap_every }}"></label>
+    <label>Assume each group stays (minutes) <input type="number" name="stay_minutes" value="{{ S.stay_minutes }}"></label>
+    <label>Max people on the farm at once <input type="number" name="max_on_farm" value="{{ S.max_on_farm }}"></label>
+    <label>Biggest group guests can book online <input type="number" name="max_group_size" min="1" value="{{ S.max_group_size }}"></label>
+  </div>
+  <label>What a bigger group sees (<b>{max}</b> becomes the number above; add your phone or email so they can reach you)
+    <textarea name="big_group_message" rows="3" style="border:1px solid #C9CEC0;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit;line-height:1.5">{{ S.big_group_message }}</textarea></label>
+  <div class="note">Guests only see arrival windows, never head counts. The app treats each group as on the farm for {{ S.stay_minutes }} minutes after its window starts, and only offers a window if adding that group keeps the farm at or under {{ S.max_on_farm }} the whole time they're here. With the general hours that's <b>{{ windows_per_day }}</b> arrival windows a day; shorter days have fewer.</div>
+  <h2>Checkout &amp; messages</h2>
+  <div class="grid">
+    <label>Hold a time while paying (minutes) <input type="number" name="hold_minutes" value="{{ S.hold_minutes }}"></label>
+    <label>Guests can reschedule until (hours before) <input type="number" name="reschedule_cutoff_hours" value="{{ S.reschedule_cutoff_hours }}"></label>
+    <label>Reminder (days before) <input type="number" name="reminder_days" value="{{ S.reminder_days }}"></label>
+  </div>
+</section>
+<section class="card">
+  <h2>Ticket policy wording</h2>
+  <p class="muted" style="margin:0">Guests must agree to this at checkout. Leave a blank line between paragraphs. <b>{cutoff}</b> becomes the reschedule cutoff ({{ S.reschedule_cutoff_hours }} hours).</p>
+  <label>Full policy (checkout page)
+    <textarea name="policy_text" rows="10" style="border:1px solid #C9CEC0;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit;line-height:1.5">{{ S.policy_text }}</textarea></label>
+  <label>Short version (confirmation page, emails and texts)
+    <textarea name="policy_short" rows="2" style="border:1px solid #C9CEC0;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit;line-height:1.5">{{ S.policy_short }}</textarea></label>
+</section>
+<button class="btn big" style="max-width:360px">Save changes</button>
+</form>
+{% endblock %}

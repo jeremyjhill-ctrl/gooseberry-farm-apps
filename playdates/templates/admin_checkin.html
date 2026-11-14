@@ -1,0 +1,38 @@
+{% extends "admin_base.html" %}
+{% block title %}Check in · {{ b.name }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<section class="card ticket">
+  <div class="row between"><span class="muted">Code <b style="color:var(--ink)">{{ b.code }}</b></span>
+    {% if b.status != 'paid' %}<span class="tag held">{{ b.status }}</span>{% elif b.checked_in %}<span class="tag in">checked in</span>{% endif %}</div>
+  <h1 style="font-size:28px">{{ b.name or 'Unnamed booking' }}</h1>
+  <div class="ticket-window"><span class="muted">{{ nice_date(b.date, long=True) }} · arrival window</span><b>{{ window_label(b.window_start) }}</b></div>
+  <div class="row" style="gap:18px">
+    <div><div class="muted">Ticket admits</div><b style="font-size:34px">{{ b.tickets }}</b></div>
+    {% if b.under2 %}<div><div class="muted">Under 2</div><b style="font-size:34px">{{ b.under2 }}</b></div>{% endif %}
+    <div><div class="muted">Paid</div><b>{{ money(paid.total) }}</b></div>
+  </div>
+  {% if used_at %}
+  <div style="background:var(--red);color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;font-size:18px" role="alert">Already checked in at {{ used_at }}.</div>
+  <p style="margin:0;font-size:14px">If this group isn't the one already inside, this ticket may have been shared. Ask for the name on the booking.</p>
+  {% endif %}
+  <div class="{{ 'note' if kind == 'on_time' else 'warn' }}" style="font-weight:800">{{ note }}</div>
+  {% if b.status == 'paid' %}
+  <form method="post">
+    <button class="btn big {{ 'ghost' if b.checked_in }}">{{ 'Undo check-in' if b.checked_in else 'Check in group of ' ~ b.tickets }}</button>
+  </form>
+  {% endif %}
+</section>
+{% if b.status == 'paid' %}
+<section class="card">
+  <h2>More people than the ticket covers?</h2>
+  <form method="post" action="{{ url_for('admin_gate', bid=b.id) }}" class="row">
+    <input type="hidden" name="back" value="checkin">
+    <input type="number" name="n" value="1" min="1" style="width:80px" aria-label="Extra people">
+    <select name="method" aria-label="Paid by"><option value="cash">cash</option><option value="card_at_gate">card</option></select>
+    <button class="btn ghost">Add people at the gate</button>
+  </form>
+</section>
+{% endif %}
+<div class="row"><a class="btn ghost" href="{{ url_for('admin_day', date=b.date) }}">Day sheet</a><a class="btn ghost" href="{{ url_for('admin_find', date=b.date) }}">Find someone else</a></div>
+{% endblock %}

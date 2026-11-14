@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Confirm your new time{% endblock %}
+{% block body %}
+<section class="card">
+  <h1 style="font-size:24px">Move your ticket?</h1>
+  <p style="margin:0">Your ticket for {{ desc }} will move to the new time. Your old time will be released to other families right away.</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+    <div class="card" style="background:#F7F5EE;gap:4px">
+      <span class="muted">From</span>
+      <b style="text-decoration:line-through;color:var(--muted)">{{ nice_date(b.date, long=True) }}</b>
+      <span style="text-decoration:line-through;color:var(--muted)">{{ window_label(b.window_start) }}</span>
+    </div>
+    <div class="card ticket" style="gap:4px">
+      <span class="muted">To</span>
+      <b>{{ nice_date(new_date, long=True) }}</b>
+      <span style="font-weight:800;font-size:20px">{{ window_label(new_start) }}</span>
+    </div>
+  </div>
+  <p class="muted" style="margin:0">Once you move, your old time may be booked by someone else, so you might not be able to switch back.</p>
+  <form method="post" action="{{ url_for('move', code=b.code) }}" style="display:flex;flex-direction:column;gap:10px">
+    <input type="hidden" name="date" value="{{ new_date }}"><input type="hidden" name="start" value="{{ new_start }}">
+    <input type="hidden" name="confirm" value="1">
+    <button class="btn big">Yes, move my ticket</button>
+  </form>
+  <a class="btn ghost" href="{{ url_for('manage', code=b.code) }}">No, keep my current time</a>
+</section>
+{% endblock %}

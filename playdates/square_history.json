@@ -1,0 +1,2117 @@
+{
+ "note": "From Square sales, by the day Square recorded each sale (the same days Square's own reports use). Groups = 'Farm Baby Playdate!' packages sold ($70; a few 2024 June ones were $60). Early Bird, bunny photo combos and private parties are not counted. Additional people = $10 'Animal Playdate Single Person' tickets sold on days that had playdates scheduled. Left out: any single sale of more than 10 people, and $10 tickets sold on days with no playdates booked (large groups and other visits). Revenue = package sales + $10 per additional person, before tax. Pulled from Square on 2026-11-13.",
+ "days": [
+  {
+   "date": "2024-03-15",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2024-03-16",
+   "groups": 2,
+   "extra": 12,
+   "revenue": 260.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-17",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-18",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-19",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-21",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 1
+  },
+  {
+   "date": "2024-03-22",
+   "groups": 3,
+   "extra": 5,
+   "revenue": 260.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-23",
+   "groups": 9,
+   "extra": 11,
+   "revenue": 740.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-25",
+   "groups": 11,
+   "extra": 0,
+   "revenue": 770.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-26",
+   "groups": 20,
+   "extra": 0,
+   "revenue": 1400.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-27",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-28",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 13
+  },
+  {
+   "date": "2024-03-29",
+   "groups": 6,
+   "extra": 18,
+   "revenue": 600.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-30",
+   "groups": 4,
+   "extra": 11,
+   "revenue": 390.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-03-31",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-01",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-02",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-03",
+   "groups": 8,
+   "extra": 0,
+   "revenue": 560.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-04",
+   "groups": 13,
+   "extra": 0,
+   "revenue": 910.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2024-04-05",
+   "groups": 11,
+   "extra": 10,
+   "revenue": 870.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-06",
+   "groups": 6,
+   "extra": 9,
+   "revenue": 510.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-08",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-09",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-10",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-11",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-12",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-13",
+   "groups": 1,
+   "extra": 9,
+   "revenue": 160.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-14",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-15",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-16",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-17",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 6
+  },
+  {
+   "date": "2024-04-18",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-19",
+   "groups": 7,
+   "extra": 7,
+   "revenue": 560.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-20",
+   "groups": 2,
+   "extra": 13,
+   "revenue": 270.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-21",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-22",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-23",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-24",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-25",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-26",
+   "groups": 3,
+   "extra": 17,
+   "revenue": 380.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-27",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-28",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-04-29",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-01",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-02",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-03",
+   "groups": 5,
+   "extra": 3,
+   "revenue": 380.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-04",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-06",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-07",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-08",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-09",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-10",
+   "groups": 5,
+   "extra": 10,
+   "revenue": 450.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-11",
+   "groups": 0,
+   "extra": 1,
+   "revenue": 10.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-12",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-14",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-15",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-16",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-18",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-19",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-21",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-23",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-24",
+   "groups": 2,
+   "extra": 7,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-25",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-28",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-29",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-05-31",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-01",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-04",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-05",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-06",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-07",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-08",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-10",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-11",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 120.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-12",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 60.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-14",
+   "groups": 2,
+   "extra": 1,
+   "revenue": 130.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-15",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 120.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-16",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 60.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-17",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2024-06-19",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 120.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-20",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 60.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 11
+  },
+  {
+   "date": "2024-06-21",
+   "groups": 1,
+   "extra": 9,
+   "revenue": 150.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-22",
+   "groups": 0,
+   "extra": 7,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2024-06-24",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 3
+  },
+  {
+   "date": "2024-06-27",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 9
+  },
+  {
+   "date": "2024-06-28",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 16,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2024-06-29",
+   "groups": 0,
+   "extra": 4,
+   "revenue": 40.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-02-03",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 3
+  },
+  {
+   "date": "2025-03-09",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-10",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-11",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-12",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-13",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-14",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2025-03-15",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-16",
+   "groups": 15,
+   "extra": 0,
+   "revenue": 1050.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-17",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 7
+  },
+  {
+   "date": "2025-03-18",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-19",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-20",
+   "groups": 10,
+   "extra": 0,
+   "revenue": 700.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 10
+  },
+  {
+   "date": "2025-03-21",
+   "groups": 4,
+   "extra": 1,
+   "revenue": 290.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-22",
+   "groups": 11,
+   "extra": 10,
+   "revenue": 870.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-23",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-24",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-25",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-26",
+   "groups": 9,
+   "extra": 0,
+   "revenue": 630.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-27",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 3
+  },
+  {
+   "date": "2025-03-28",
+   "groups": 3,
+   "extra": 22,
+   "revenue": 430.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-29",
+   "groups": 2,
+   "extra": 6,
+   "revenue": 200.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-30",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-03-31",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-01",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-02",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-03",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-04",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-05",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-06",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-07",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-08",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-09",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-10",
+   "groups": 8,
+   "extra": 0,
+   "revenue": 560.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2025-04-11",
+   "groups": 11,
+   "extra": 2,
+   "revenue": 790.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-12",
+   "groups": 10,
+   "extra": 1,
+   "revenue": 710.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-13",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-14",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-15",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-16",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-17",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 6
+  },
+  {
+   "date": "2025-04-18",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-19",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-20",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-21",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 39
+  },
+  {
+   "date": "2025-04-23",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-24",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 16,
+   "nonplay_left_out": 7
+  },
+  {
+   "date": "2025-04-25",
+   "groups": 2,
+   "extra": 10,
+   "revenue": 240.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-26",
+   "groups": 4,
+   "extra": 6,
+   "revenue": 340.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-27",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-28",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-04-29",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-01",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-02",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 6
+  },
+  {
+   "date": "2025-05-03",
+   "groups": 5,
+   "extra": 23,
+   "revenue": 580.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-04",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-05",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-06",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-07",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 23
+  },
+  {
+   "date": "2025-05-08",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-09",
+   "groups": 8,
+   "extra": 22,
+   "revenue": 780.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-10",
+   "groups": 3,
+   "extra": 13,
+   "revenue": 340.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-12",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 10
+  },
+  {
+   "date": "2025-05-13",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-15",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-16",
+   "groups": 1,
+   "extra": 6,
+   "revenue": 130.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-17",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-18",
+   "groups": 2,
+   "extra": 10,
+   "revenue": 240.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-20",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 29
+  },
+  {
+   "date": "2025-05-21",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 28
+  },
+  {
+   "date": "2025-05-22",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-23",
+   "groups": 2,
+   "extra": 9,
+   "revenue": 230.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-24",
+   "groups": 1,
+   "extra": 4,
+   "revenue": 110.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-25",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-26",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-28",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-29",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-30",
+   "groups": 2,
+   "extra": 9,
+   "revenue": 230.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-05-31",
+   "groups": 2,
+   "extra": 3,
+   "revenue": 170.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-01",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-04",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-05",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-06",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-07",
+   "groups": 3,
+   "extra": 3,
+   "revenue": 240.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-08",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-12",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-13",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 20,
+   "nonplay_left_out": 1
+  },
+  {
+   "date": "2025-06-14",
+   "groups": 0,
+   "extra": 5,
+   "revenue": 50.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2025-06-19",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 9
+  },
+  {
+   "date": "2025-06-20",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 9
+  },
+  {
+   "date": "2025-06-21",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 5
+  },
+  {
+   "date": "2025-06-23",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 3
+  },
+  {
+   "date": "2025-06-25",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2025-06-26",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2025-06-27",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 6
+  },
+  {
+   "date": "2025-06-30",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 16
+  },
+  {
+   "date": "2026-02-22",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-10",
+   "groups": 12,
+   "extra": 0,
+   "revenue": 840.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-11",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-12",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-13",
+   "groups": 16,
+   "extra": 4,
+   "revenue": 1160.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-14",
+   "groups": 9,
+   "extra": 0,
+   "revenue": 630.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-15",
+   "groups": 11,
+   "extra": 0,
+   "revenue": 770.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-16",
+   "groups": 8,
+   "extra": 0,
+   "revenue": 560.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-17",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2026-03-18",
+   "groups": 10,
+   "extra": 14,
+   "revenue": 840.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-19",
+   "groups": 5,
+   "extra": 4,
+   "revenue": 390.0,
+   "big_left_out": 13,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-20",
+   "groups": 6,
+   "extra": 4,
+   "revenue": 460.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-21",
+   "groups": 3,
+   "extra": 3,
+   "revenue": 240.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-22",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-23",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-24",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-25",
+   "groups": 8,
+   "extra": 0,
+   "revenue": 560.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-26",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2026-03-27",
+   "groups": 4,
+   "extra": 11,
+   "revenue": 390.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-28",
+   "groups": 3,
+   "extra": 26,
+   "revenue": 470.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-29",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-03-31",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-01",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-02",
+   "groups": 7,
+   "extra": 0,
+   "revenue": 490.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 9
+  },
+  {
+   "date": "2026-04-03",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-04",
+   "groups": 1,
+   "extra": 5,
+   "revenue": 120.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-05",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-06",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-07",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 80,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-08",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-09",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-10",
+   "groups": 5,
+   "extra": 12,
+   "revenue": 470.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-11",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-12",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 21
+  },
+  {
+   "date": "2026-04-13",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 30
+  },
+  {
+   "date": "2026-04-14",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-15",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 44
+  },
+  {
+   "date": "2026-04-16",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-17",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 5
+  },
+  {
+   "date": "2026-04-18",
+   "groups": 1,
+   "extra": 18,
+   "revenue": 250.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-19",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-20",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-22",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-23",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2026-04-24",
+   "groups": 7,
+   "extra": 3,
+   "revenue": 520.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-25",
+   "groups": 2,
+   "extra": 1,
+   "revenue": 150.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-26",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-27",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-28",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-04-30",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 28
+  },
+  {
+   "date": "2026-05-01",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 13
+  },
+  {
+   "date": "2026-05-02",
+   "groups": 1,
+   "extra": 7,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-03",
+   "groups": 3,
+   "extra": 0,
+   "revenue": 210.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-04",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-05",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 22
+  },
+  {
+   "date": "2026-05-06",
+   "groups": 6,
+   "extra": 0,
+   "revenue": 420.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-07",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 41
+  },
+  {
+   "date": "2026-05-08",
+   "groups": 5,
+   "extra": 7,
+   "revenue": 420.0,
+   "big_left_out": 12,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-09",
+   "groups": 3,
+   "extra": 4,
+   "revenue": 250.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-10",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-12",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-14",
+   "groups": 5,
+   "extra": 0,
+   "revenue": 350.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-15",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 4
+  },
+  {
+   "date": "2026-05-16",
+   "groups": 1,
+   "extra": 6,
+   "revenue": 130.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-20",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 25
+  },
+  {
+   "date": "2026-05-21",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-22",
+   "groups": 4,
+   "extra": 0,
+   "revenue": 280.0,
+   "big_left_out": 12,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-23",
+   "groups": 1,
+   "extra": 5,
+   "revenue": 120.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-24",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-26",
+   "groups": 2,
+   "extra": 0,
+   "revenue": 140.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-29",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-05-30",
+   "groups": 1,
+   "extra": 0,
+   "revenue": 70.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 0
+  },
+  {
+   "date": "2026-06-17",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 12
+  },
+  {
+   "date": "2026-06-18",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 22
+  },
+  {
+   "date": "2026-06-19",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 40
+  },
+  {
+   "date": "2026-06-20",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 2
+  },
+  {
+   "date": "2026-06-22",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 12
+  },
+  {
+   "date": "2026-06-24",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 8
+  },
+  {
+   "date": "2026-06-26",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 24
+  },
+  {
+   "date": "2026-06-27",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 14
+  },
+  {
+   "date": "2026-06-29",
+   "groups": 0,
+   "extra": 0,
+   "revenue": 0.0,
+   "big_left_out": 0,
+   "nonplay_left_out": 20
+  }
+ ]
+}

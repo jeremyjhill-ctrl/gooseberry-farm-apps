@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}You're booked{% endblock %}
+{% block body %}
+<section class="card" style="align-items:center;text-align:center">
+  <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#E8F0DD"/><path d="M20 33l8 8 16-17" fill="none" stroke="#2F5D3A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <h1>You're booked!</h1>
+  <p style="margin:0">The babies can't wait to meet you.</p>
+</section>
+<section class="card">
+  <div style="font-weight:800">{{ nice_date(b.date, long=True) }}</div>
+  <div>Arrival window: <strong>{{ window_label(b.window_start) }}</strong></div>
+  <div class="muted">{{ S.policy_short }}</div>
+  <div>{{ desc }} · Paid {{ money(paid.total) }}</div>
+  <div class="muted">Confirmation code {{ b.code }} · 177 Elm Grove Rd, Rogersville, MO 65742</div>
+</section>
+<div class="note">We emailed and texted you a link to your ticket: <b>one ticket for your whole group</b>. Show that page at the gate.{% if b.sms_ok %} We'll text you a reminder the day before.{% endif %}</div>
+<div class="card" style="flex-direction:row;align-items:flex-start;gap:12px">
+  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17l1.5-5h9L18 17M7 17v2M17 17v2M8.5 12l1-3h5l1 3" fill="none" stroke="#2F5D3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span style="font-size:14px">We're a working farm and our parking is limited. Carpooling is greatly appreciated!</span>
+</div>
+<p style="margin:0;font-size:14px">Bringing someone else? Everyone age 2 and up must be on your ticket. Add them before you come so their spot is saved.</p>
+<div class="row">
+  <a class="btn" href="{{ url_for('ticket', code=b.code) }}">View my ticket</a>
+  <a class="btn ghost" href="{{ url_for('manage', code=b.code) }}">Add people or change my time</a>
+</div>
+<a href="{{ url_for('book') }}" class="muted" style="text-align:center">Book another playdate (test)</a>
+{% endblock %}

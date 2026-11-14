@@ -1,0 +1,21 @@
+{% extends "admin_base.html" %}
+{% block title %}Bookings{% endblock %}
+{% block body %}
+<section class="card">
+  <div class="row between"><h2>Bookings</h2>
+    <div class="row">{% for st in ['paid','held','cancelled','expired','released','all'] %}<a class="pill {% if st == status %}on{% endif %}" href="{{ url_for('admin_bookings', status=st) }}">{{ st }}</a>{% endfor %}</div></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Day</th><th>Arrival</th><th>Name</th><th class="num">People</th><th class="num">Paid</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td>{{ nice_date(r.date) }}</td><td>{{ window_label(r.window_start) }}</td>
+        <td><b>{{ r.name or '—' }}</b><div class="muted">{{ r.email or '' }} {{ r.phone or '' }}</div></td>
+        <td class="num">{{ r.tickets }}{% if r.under2 %} <span class="muted">+{{ r.under2 }}</span>{% endif %}</td>
+        <td class="num">{{ money(r.paid) }}</td><td><span class="tag">{{ r.status }}</span>{% if r.demo %} <span class="tag">pretend</span>{% endif %}</td>
+        <td class="row" style="gap:6px"><a class="btn ghost" style="min-height:36px" href="{{ url_for('ticket', code=r.code) }}">Ticket</a>
+          {% if r.status == 'paid' %}<form method="post" action="{{ url_for('admin_cancel', bid=r.id) }}" onsubmit="return confirm('Cancel this booking?')"><button class="btn red ghost" style="min-height:36px">Cancel</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Nothing here yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

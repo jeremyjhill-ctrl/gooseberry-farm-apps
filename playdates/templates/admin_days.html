@@ -1,0 +1,25 @@
+{% extends "admin_base.html" %}
+{% block title %}Day adjustments{% endblock %}
+{% block body %}
+<section class="card">
+  <h2>Day-by-day adjustments</h2>
+  <p style="margin:0;font-size:14px">Raise or lower the most people on the farm at once for a single day, for staffing, the animals, weather or mud. Every other day uses {{ S.max_on_farm }}. Lowering a day never cancels anyone who already booked; it only stops new bookings once the day is full under the new number.</p>
+  <form method="post" class="row" style="align-items:flex-end">
+    <label>Day <input type="date" name="date" required></label>
+    <label>Max people on the farm <input type="number" name="max_on_farm" value="{{ S.max_on_farm }}" min="0" required style="width:140px"></label>
+    <label style="flex:1 1 220px">Reason (only you see this) <input type="text" name="note"></label>
+    <button class="btn">Save</button>
+  </form>
+</section>
+<section class="card">
+  <div class="scroll"><table>
+    <thead><tr><th>Day</th><th class="num">Max on farm</th><th>Reason</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td>{{ nice_date(r.date) }}</td><td class="num"><b>{{ r.max_on_farm }}</b></td><td>{{ r.note }}</td>
+      <td><form method="post"><input type="hidden" name="delete" value="{{ r.date }}"><button class="btn ghost" style="min-height:36px">Remove</button></form></td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No adjustments yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

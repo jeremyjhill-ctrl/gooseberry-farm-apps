@@ -1,0 +1,96 @@
+{% extends "admin_base.html" %}
+{% block title %}Release calendar{% endblock %}
+{% block body %}
+<section class="card">
+  <div class="row between">
+    <div>
+      <h1 style="font-size:26px">Release calendar</h1>
+      <p class="muted" style="margin:4px 0 0">Guests can only see and book <b style="color:var(--green-dk)">green</b> days. Tap a day to release it or hide it again. {% if last_live %}Released through <b>{{ nice_date(last_live) }}</b> ({{ live_count }} upcoming day{{ 's' if live_count != 1 }}).{% else %}Nothing is released yet.{% endif %}</p>
+    </div>
+    <form method="post" action="{{ url_for('admin_calendar_release') }}" class="row">
+      <label class="inline" style="align-items:center;gap:8px">Release your usual days through <input type="date" name="through" value="{{ suggest_through }}" required></label>
+      <button class="btn">Release</button>
+    </form>
+  </div>
+  <div class="row muted" style="gap:14px;font-size:13px">
+    <span><span class="key" style="background:var(--tint);border-color:var(--green)"></span> live</span>
+    <span><span class="key" style="background:#fff;border-color:#9DB98A;border-style:dashed"></span> a usual day, not released yet</span>
+    <span><span class="key" style="background:#F1F0EA;border-color:#E2E4DA"></span> usually closed (you can still release it)</span>
+    <span>✎ = this day has its own hours, crowd limit or breaks</span>
+  </div>
+</section>
+
+{% if editing %}
+<section class="card" style="border:2px solid var(--green)" id="editor">
+  <div class="row between">
+    <h2>{{ nice_date(editing.date, long=True) }}</h2>
+    <a class="muted" href="{{ url_for('admin_calendar') }}#m-{{ editing.date[:7] }}">Close</a>
+  </div>
+  <form method="post" action="{{ url_for('admin_calendar_toggle') }}" class="row">
+    <input type="hidden" name="date" value="{{ editing.date }}"><input type="hidden" name="edit" value="{{ editing.date }}">
+    <span>{% if editing.live %}<b style="color:var(--green-dk)">Live.</b> Guests can book this day.{% else %}<b>Not released.</b> Guests can't see this day.{% endif %}</span>
+    <button class="btn {{ 'ghost' if editing.live }}">{{ 'Hide from guests' if editing.live else 'Release this day' }}</button>
+  </form>
+  <form method="post" action="{{ url_for('admin_calendar_day') }}" style="display:flex;flex-direction:column;gap:14px">
+    <input type="hidden" name="date" value="{{ editing.date }}">
+    <h3 style="margin:6px 0 0">Hours</h3>
+    <div class="grid">
+      <label>First arrival <input type="time" name="first_arrival" value="{{ editing.start }}" required></label>
+      <label>Close (last window ends) <input type="time" name="close_time" value="{{ editing.end }}" required></label>
+    </div>
+    <p class="muted" style="margin:-6px 0 0">{% if editing.custom %}This day has its own hours.{% else %}Using the usual {{ editing.weekday }} hours.{% endif %}</p>
+
+    <h3 style="margin:6px 0 0">How busy this day can get</h3>
+    <div class="grid">
+      <label>Most people on the farm at once
+        <input type="number" name="max_on_farm" min="0" value="{{ editing.cap if editing.cap is not none }}" placeholder="usual: {{ S.max_on_farm }}">
+      </label>
+      <label>Planned breaks
+        <select name="gap_every">
+          <option value="usual" {{ 'selected' if editing.gap_every is none }}>Usual ({% if S.gap_every|int == 0 %}no breaks{% else %}after every {{ S.gap_every }} windows{% endif %})</option>
+          <option value="0" {{ 'selected' if editing.gap_every == 0 }}>No breaks</option>
+          {% for n in [2,3,4,5,6] %}<option value="{{ n }}" {{ 'selected' if editing.gap_every == n }}>A break after every {{ n }} windows</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <p class="muted" style="margin:-6px 0 0">Leave the number blank to use your usual {{ S.max_on_farm }}. It's a rolling count: each group is counted for {{ S.stay_minutes }} minutes from its arrival time, so a limit of 10 works out to about 10 people an hour, never 10 all landing at once on top of 10 more.{% if editing.groups %} This day already has {{ editing.groups }} group{{ 's' if editing.groups != 1 }} ({{ editing.people }} people) booked; a lower limit only stops new bookings, it never bumps anyone.{% endif %}</p>
+
+    <label>Note (only you see this) <input type="text" name="note" value="{{ editing.note }}" placeholder="e.g. school holiday, just Jeremy and Staci"></label>
+    <div class="row">
+      <button class="btn">Save this day</button>
+      {% if editing.special %}<button class="btn ghost" name="reset" value="1" formnovalidate>Back to usual {{ editing.weekday }} settings</button>{% endif %}
+    </div>
+    <p class="muted" style="margin:0">Saving never moves or cancels anyone who already booked.</p>
+  </form>
+</section>
+{% endif %}
+
+{% for mo in months %}
+<section class="card" id="{{ mo.id }}">
+  <h2>{{ mo.label }}</h2>
+  <div class="scroll">
+  <div class="month">
+    {% for wd in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] %}<div class="month-h">{{ wd }}</div>{% endfor %}
+    {% for week in mo.weeks %}{% for c in week %}
+      {% if not c %}<div></div>
+      {% else %}
+      <div class="mday {{ 'live' if c.live }} {{ 'usual' if c.usual and not c.live }} {{ 'past' if c.past }} {{ 'off' if not c.in_season }} {{ 'editing' if editing and editing.date == c.date }}">
+        <form method="post" action="{{ url_for('admin_calendar_toggle') }}">
+          <input type="hidden" name="date" value="{{ c.date }}">{% if editing %}<input type="hidden" name="edit" value="{{ editing.date }}">{% endif %}
+          <button class="mday-btn" aria-pressed="{{ 'true' if c.live else 'false' }}" aria-label="{{ nice_date(c.date) }}: {{ 'live, tap to hide' if c.live else 'not released, tap to release' }}" {{ 'disabled' if c.past }}>
+            <span class="mday-num">{{ c.num }}</span>
+            {% if c.live %}<span class="mday-hrs">{{ c.hours }}</span>{% elif c.usual and c.in_season %}<span class="mday-hrs">not released</span>{% elif not c.in_season %}<span class="mday-hrs">off season</span>{% endif %}
+            {% if c.cap is not none and (c.live or c.usual) %}<span class="mday-cap">max {{ c.cap }} at once</span>{% endif %}
+            {% if c.groups %}<span class="mday-bk">{{ c.groups }} groups · {{ c.people }} people</span>{% endif %}
+            {% if c.stopped %}<span class="mday-bk" style="color:var(--red)">stopped</span>{% endif %}
+          </button>
+        </form>
+        <a class="mday-edit" href="{{ url_for('admin_calendar', edit=c.date) }}#editor" aria-label="Hours, crowd limit and notes for {{ nice_date(c.date) }}">{{ '✎ edit' if c.custom or c.cap is not none or c.own_breaks else 'edit' }}</a>
+      </div>
+      {% endif %}
+    {% endfor %}{% endfor %}
+  </div>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
