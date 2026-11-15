@@ -63,7 +63,8 @@ def compose(kind, o, s, order_url):
             'Please put "Order #{}" in the payment note so Mollie can match it up.'.format(o["number"]),
             "Your order:\n" + _lines(o),
             _pickup(o),
-            "If it isn't paid by then, the items go back on sale. Your order page: {}".format(order_url),
+            "If it isn't paid by {}, the items go back on sale.".format(pay_by),
+            "Your order page: {}".format(order_url),
             "Questions? Just reply to this email.\n{}".format(shop),
         ])
     else:
