@@ -18,6 +18,7 @@ os.environ["FARM_DATA_DIR"] = work
 os.environ["PLAYDATE_DB"] = os.path.join(work, "playdates.db")
 os.environ["BAKERY_PASSWORD"] = "pie"
 os.environ["BAKERY_SECRET_KEY"] = "test"
+os.environ["MAIL_PROVIDER"] = "memory"  # capture customer emails instead of sending them
 if os.environ.get("DATABASE_URL"):
     os.environ["FARM_DB_NAME"] = "bakery_" + os.path.basename(work).replace("-", "_").lower()
 use_r2 = "--r2" in sys.argv
@@ -121,6 +122,18 @@ check("deadline closes orders", not shop["ordering"]["open"] and "deadline" in s
 code, _ = api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"deadline": "", "orderingOpen": False}})
 _, shop = api("GET", "api/shop")
 check("stop button closes orders", not shop["ordering"]["open"])
+
+# ---- customer emails
+sent = wsgi.bakery.mailer.sent
+subjects = [m["subject"] for m in sent]
+check("card order gets one 'confirmed' email", sum(1 for x in subjects if x.startswith("Order #1001 is confirmed")) == 1, subjects)
+check("app order gets a 'reserved' email with how to pay", any(x.startswith("Order #1002 is reserved") for x in subjects), subjects)
+rsv = next((m for m in sent if m["subject"].startswith("Order #1002 is reserved")), {"text": ""})
+check("reserved email has the payment buttons' links and note", "venmo.com" in rsv["text"] and "Order #1002" in rsv["text"] and "$33.95" in rsv["text"], rsv["text"][:300])
+check("app order gets 'confirmed' once Mollie marks it paid", sum(1 for x in subjects if x.startswith("Order #1002 is confirmed")) == 1, subjects)
+api("POST", "api/admin/action", {"action": "markPaid", "id": app_id})
+check("no duplicate email if marked paid twice", sum(1 for m in wsgi.bakery.mailer.sent if m["subject"].startswith("Order #1002 is confirmed")) == 1)
+check("emails go to the customer", all(m["to"] == "buyer@example.com" for m in sent))
 
 other = Client(wsgi.application)
 code, _ = api("GET", "api/admin/state", client=other)

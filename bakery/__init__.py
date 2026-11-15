@@ -11,6 +11,8 @@ Settings (environment variables):
   BAKERY_STRIPE_WEBHOOK_SECRET  from her Stripe webhook for <site>/api/stripe/webhook
   DATABASE_URL                  on Render: the Postgres server (data goes in the farm_apps database)
   FARM_DATA_DIR                 on the Mac: folder for the bakery's data file and photos
+  MAIL_PROVIDER, RESEND_API_KEY, BAKERY_MAIL_FROM
+                                customer emails (console = print instead of send, the default)
   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
                                 Cloudflare R2 bucket for Mollie's photos (private; this app serves them)
 """
@@ -26,11 +28,12 @@ import sys
 from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import store
+from . import emails, store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402  (SQLite file on the Mac, Postgres on Render)
+import mailer  # noqa: E402  (same mail code as Pasture Keeper)
 
 
 def create_app():
@@ -42,6 +45,7 @@ def create_app():
     stripe_key = os.environ.get("BAKERY_STRIPE_SECRET_KEY", "")
     webhook_secret = os.environ.get("BAKERY_STRIPE_WEBHOOK_SECRET", "")
     demo = not stripe_key
+    mail = mailer.build_mailer("BAKERY_MAIL_FROM")  # refuses to start if half set up
     r2 = None
     if os.environ.get("R2_BUCKET"):
         import boto3  # only needed when photos go to Cloudflare R2
@@ -140,6 +144,21 @@ def create_app():
                 f.write(data)
         return "uploads/" + name
 
+    def notify(order_id, kind):
+        """Send the "reserved" or "paid" email once per order, whichever path got there first."""
+        with changing() as state:
+            o = store.find_order(state, order_id)
+            if not o or kind in o.setdefault("mailed", []):
+                return
+            o["mailed"].append(kind)
+            order, settings = json.loads(json.dumps(o)), dict(state["settings"])
+        subject, text = emails.compose(kind, order, settings, site() + "?order=" + order_id)
+        if not mail.send(order["customer"]["email"], subject, text):
+            with changing() as state:
+                o = store.find_order(state, order_id)
+                if o:
+                    o.setdefault("mailProblems", []).append(kind)
+
     # ---------------------------------------------------------------- pages
     @app.get("/")
     def index():
@@ -182,11 +201,13 @@ def create_app():
 
         # Venmo / Cash App / PayPal: reserved now; the confirmation page shows how to pay.
         if order["payMethod"] == "app":
+            notify(order["id"], "reserved")
             return jsonify(orderId=order["id"], url=site() + "?order=" + order["id"])
 
         if demo:
             with changing() as state:
                 store.mark_paid(state, order["id"], None, store.now_ms())
+            notify(order["id"], "paid")
             return jsonify(orderId=order["id"], url=site() + "?order=" + order["id"])
 
         try:
@@ -239,6 +260,7 @@ def create_app():
                 if cs["payment_status"] == "paid":
                     with changing() as state:
                         o = store.mark_paid(state, order_id, {"amountPaid": cs["amount_total"]}, store.now_ms())
+                    notify(order_id, "paid")
             except Exception:  # noqa: BLE001
                 app.logger.exception("Stripe lookup failed")
         return jsonify(store.public_order(o, state["settings"]))
@@ -269,13 +291,17 @@ def create_app():
             return "Webhook error: {}".format(e), 400
         cs = event["data"]["object"]
         order_id = (cs.get("metadata") or {}).get("orderId")
+        paid = False
         with changing() as state:
             o = store.find_order(state, order_id)
             if o:
                 if event["type"] == "checkout.session.completed" and cs.get("payment_status") == "paid":
                     store.mark_paid(state, order_id, {"amountPaid": cs.get("amount_total")}, store.now_ms())
+                    paid = True
                 elif event["type"] == "checkout.session.expired" and o["status"] == "pending":
                     o["status"] = "expired"
+        if paid:
+            notify(order_id, "paid")
         return jsonify(received=True)
 
     # ---------------------------------------------------------------- Mollie
@@ -312,6 +338,8 @@ def create_app():
                 a["item"]["image"] = save_photo(a["item"]["image"])
             with changing() as state:
                 result = store.admin_action(state, a, store.now_ms())
+            if a.get("action") == "markPaid":
+                notify(a.get("id"), "paid")
             return jsonify(result)
         except Exception as e:  # noqa: BLE001
             return fail(e)
@@ -327,6 +355,8 @@ def create_app():
 
     @app.get("/api/health")
     def health():
-        return jsonify(ok=True, demo=demo)
+        return jsonify(ok=True, demo=demo, email=mail.kind)
+
+    app.mailer = mail  # lets the tests see what would have been sent
 
     return app

@@ -67,6 +67,11 @@ if ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/bakery_te
   cat /tmp/farm-bakery.json; tail -20 /tmp/farm-bakery.log
   pause; exit 1
 fi
+if [ -f "$WORK/tests/playdate_email_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/playdate_email_test.py > /tmp/farm-email.json 2>/tmp/farm-email.log); then
+  echo "STOPPED: the playdate email check failed on this delivery, so nothing was published."
+  cat /tmp/farm-email.json; tail -20 /tmp/farm-email.log
+  pause; exit 1
+fi
 echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery."
 
 echo

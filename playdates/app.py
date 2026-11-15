@@ -21,6 +21,7 @@ from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                    request, session, url_for)
 
 import dbcompat  # same SQLite file on the Mac; Postgres on Render (see dbcompat.py)
+import farm_mail  # real email only when PLAYDATE_EMAILS=on (see farm_mail.py)
 import logic
 
 try:  # QR codes on tickets; the app still works without them (it just shows the code)
@@ -239,6 +240,8 @@ def send(booking, channel, subject, body):
         return
     db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (?,?,?,?,?,?)",
                  (booking["id"], channel, recipient, subject, body, now().isoformat()))
+    if channel == "email":
+        farm_mail.deliver(recipient, subject, body)
 
 
 def ticket_link(code):

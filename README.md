@@ -30,3 +30,15 @@ playdates. On one computer the bakery is also at `/bakery/`.
 Data lives in its own `farm_apps` database on Pasture Keeper's Postgres server (created automatically).
 Mollie's photos live in the private Cloudflare R2 bucket `farm-apps-photos`. No disk, so publishing has no downtime.
 Setup steps and settings: see "Go-live setup" in the Booking and Online Ordering App project.
+
+## Customer emails
+
+Both apps send mail with the same code Pasture Keeper uses (`playdates/mailer.py`, through Resend).
+
+* Bakery: a "reserved, here's how to pay" email for Venmo / Cash App / PayPal orders, and an
+  "order confirmed" email once it's paid (card, or Mollie taps Mark paid). Each is sent once.
+  From: `BAKERY_MAIL_FROM`. If one fails, the order shows a note in Mollie's orders list.
+* Playdates: the messages it already writes to Admin > Messages are also emailed for real, but only
+  when `PLAYDATE_EMAILS=on`. From: `PLAYDATE_MAIL_FROM`. Texts are unchanged.
+* With `MAIL_PROVIDER` unset (the Mac), nothing is sent; emails are printed in the Terminal window.
+* Half-finished mail settings stop the server from starting, rather than failing quietly.

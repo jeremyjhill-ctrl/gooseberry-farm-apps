@@ -90,6 +90,7 @@ window.Admin = (function () {
         <div style="text-align:right"><b>${money(o.total)}</b><br /><span class="pill ${o.payMethod === 'app' ? 'berry' : ''}" style="margin:0">${o.payMethod === 'app' ? 'App' : 'Card'}</span></div></div>
       <ul>${o.lines.map((l) => `<li>${l.qty} × ${h(l.name)}</li>`).join('')}</ul>
       ${o.allergyNote ? `<div class="note"><b>Allergy note:</b> ${h(o.allergyNote)}</div>` : ''}
+      ${o.mailProblems && o.mailProblems.length ? `<div class="note" style="background:#f6e2dd">The confirmation email didn’t send. You may want to text them.</div>` : ''}
       <div class="actions"><label class="picked"><input type="checkbox" data-picked="${o.id}" ${o.pickedUp ? 'checked' : ''} /> Picked up</label>
         <span style="flex:1"></span><button class="btn link small" data-cancel-order="${o.id}">${armed === 'o' + o.id ? 'Tap again to remove' : 'Remove'}</button></div>
     </div>`;
