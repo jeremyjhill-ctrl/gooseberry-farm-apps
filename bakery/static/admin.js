@@ -220,7 +220,7 @@ window.Admin = (function () {
       <label class="switch"><input type="checkbox" name="orderingOpen" ${s.orderingOpen ? 'checked' : ''} /> Taking preorders</label>
       ${f('shopName', 'Shop name')}
       ${f('tagline', 'Tagline')}
-      ${f('intro', 'Intro', 'The first thing customers read: pickup day, deadline, anything important.', 'area')}
+      ${f('intro', 'Welcome message', 'Shown at the top of the order page. Say what you’re offering, the order deadline, and when and where pickup is. Press Return for a new paragraph.', 'area')}
       ${f('dietaryNote', 'Dietary note', 'Shown in the green box at the top.', 'area')}
       ${f('contactNote', 'Contact line', 'Shown at the bottom of the page.')}
       <label class="field"><span>Most of one item per order</span><input type="number" name="perOrderMax" min="1" max="99" value="${s.perOrderMax}" /></label>

@@ -165,15 +165,12 @@ window.Shop = (function () {
   function render() {
     const s = data.settings;
     const n = count();
-    const deadline = s.deadline ? `<span class="chip berry">Order by ${h(fmtDate(s.deadline, s.timezone))}</span>` : '';
-    const pickupChips = data.pickups.map((p) => `<span class="chip">${h(p.label)}</span>`).join('');
     app().innerHTML = `
       <header class="hero wrap">
         <div class="eyebrow">${h(s.season)} preorders</div>
         <h1>${h(s.shopName)}</h1>
         ${s.tagline ? `<p class="tagline">${h(s.tagline)}</p>` : ''}
         ${s.intro ? `<p class="intro">${h(s.intro)}</p>` : ''}
-        <div class="chips">${deadline}${pickupChips}</div>
         ${s.dietaryNote ? `<div class="dietary">${leafIcon}<span>${h(s.dietaryNote)}</span></div>` : ''}
       </header>
       <main class="wrap">
