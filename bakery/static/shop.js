@@ -5,6 +5,7 @@ window.Shop = (function () {
   let cart = store.get('mfb_cart', {});
   let form = Object.assign({ name: '', email: '', phone: '', pickupId: '', pickupWindowId: '', pickupTime: '', allergyNote: '', payMethod: 'card' }, store.get('mfb_form', {}));
   let sheetOpen = false;
+  let detailId = null; // item whose detail panel is open
   let busy = false;
   let error = '';
 
@@ -77,10 +78,11 @@ window.Shop = (function () {
     let control = '';
     if (open && !soldOut) control = q ? stepper(item) : `<button class="btn ghost small add-btn" data-inc="${item.id}">Add</button>`;
     return `<article class="card">
-      <div class="photo">${photo(item)}${badge}</div>
+      <div class="photo" data-detail="${item.id}" role="button" tabindex="0" aria-label="More about ${h(item.name)}">${photo(item)}${badge}</div>
       <div class="body">
-        <h3>${h(item.name)}</h3>
-        <p class="desc">${h(item.description)}</p>
+        <h3><button type="button" class="name-btn" data-detail="${item.id}">${h(item.name)}</button></h3>
+        <p class="desc">${h(item.description)}${item.details ? ` <button type="button" class="more" data-detail="${item.id}">More</button>` : ''}</p>
+        ${item.contains ? `<p class="contains">Contains ${h(item.contains)}</p>` : ''}
         <div class="row"><span class="price">${money(item.price)}</span>${control}</div>
         ${open && !soldOut ? limitNote(item) : ''}
       </div>
@@ -115,6 +117,28 @@ window.Shop = (function () {
         ${choices.map((c) => `<option value="${h(c.value)}" ${chosen && chosen.value === c.value ? 'selected' : ''} ${c.full ? 'disabled' : ''}>${h(c.text)}${c.full ? ' (full)' : ''}</option>`).join('')}
       </select>
       ${chosen && chosen.place.details ? `<div class="pickbox pickup-where"><b>${h(chosen.place.label)}</b><br /><span class="muted">${h(chosen.place.details)}</span></div>` : ''}`;
+  }
+
+  // Tapping an item: bigger photo, Mollie's full description, and the same Add / + − buttons.
+  function detail() {
+    const item = data.items.find((i) => i.id === detailId);
+    if (!item) return '';
+    const open = data.ordering.open;
+    const soldOut = item.remaining === 0;
+    const q = cart[item.id] || 0;
+    const control = !open ? '' : soldOut ? '<span class="badge out" style="position:static">Sold out</span>'
+      : q ? stepper(item) : `<button class="btn small" data-inc="${item.id}">Add</button>`;
+    const n = count();
+    return `<div class="sheet-bg" data-close-detail>
+      <div class="sheet detail" role="dialog" aria-modal="true" aria-label="${h(item.name)}">
+        <div class="sheet-head"><h2>${h(item.name)}</h2><button type="button" class="x" data-close-detail aria-label="Close">×</button></div>
+        <div class="detail-photo">${photo(item)}</div>
+        ${item.contains ? `<p class="contains">Contains ${h(item.contains)}</p>` : ''}
+        <p class="detail-text">${h(item.details || item.description)}</p>
+        <div class="row detail-row"><span class="price">${money(item.price)}</span>${control}</div>
+        ${open && !soldOut ? limitNote(item) : ''}
+        <button type="button" class="btn ghost detail-done" data-close-detail>${n ? `Keep shopping · ${n} item${n > 1 ? 's' : ''} in your order` : 'Back to the menu'}</button>
+      </div></div>`;
   }
 
   function sheet() {
@@ -193,9 +217,9 @@ window.Shop = (function () {
         ${s.contactNote ? `<p>${h(s.contactNote)}</p>` : ''}
         <p><a class="quiet" href="#admin">Baker login</a></p>
       </div></footer>
-      ${n && data.ordering.open && !sheetOpen ? `<div class="cartbar"><button class="btn" data-open><span>Review order · ${n} item${n > 1 ? 's' : ''}</span><span>${money(total())} →</span></button></div>` : ''}
-      ${sheetOpen ? sheet() : ''}`;
-    document.body.style.overflow = sheetOpen ? 'hidden' : '';
+      ${n && data.ordering.open && !sheetOpen && !detailId ? `<div class="cartbar"><button class="btn" data-open><span>Review order · ${n} item${n > 1 ? 's' : ''}</span><span>${money(total())} →</span></button></div>` : ''}
+      ${sheetOpen ? sheet() : detailId ? detail() : ''}`;
+    document.body.style.overflow = sheetOpen || detailId ? 'hidden' : '';
   }
 
   function bump(id, d) {
@@ -319,11 +343,16 @@ window.Shop = (function () {
   function bind() {
     const el = app();
     el.onclick = (e) => {
-      const t = e.target.closest('[data-inc],[data-dec],[data-open],[data-close],[data-home],[data-copy-memo],[data-demo-pay]');
+      const t = e.target.closest('[data-inc],[data-dec],[data-open],[data-close],[data-detail],[data-close-detail],[data-home],[data-copy-memo],[data-demo-pay]');
       if (!t) return;
       if (t.dataset.demoPay) return toast(`In the real shop, this opens ${t.dataset.demoPay} with the amount filled in.`);
       if (t.dataset.copyMemo) {
         navigator.clipboard.writeText(t.dataset.copyMemo).then(() => toast('Copied'), () => toast('Type it in the note: ' + t.dataset.copyMemo));
+        return;
+      }
+      if (t.dataset.detail) { detailId = t.dataset.detail; render(); return; }
+      if ('closeDetail' in t.dataset) {
+        if (t === e.target || t.closest('button')) { detailId = null; render(); }
         return;
       }
       if (t.dataset.inc) bump(t.dataset.inc, 1);
@@ -363,12 +392,15 @@ window.Shop = (function () {
     };
     document.onkeydown = (e) => {
       if (e.key === 'Escape' && sheetOpen) { sheetOpen = false; render(); }
+      else if (e.key === 'Escape' && detailId) { detailId = null; render(); }
+      else if (e.key === 'Enter' && e.target.dataset && e.target.dataset.detail) { detailId = e.target.dataset.detail; render(); }
     };
   }
 
   async function start() {
     bind();
     sheetOpen = false;
+    detailId = null;
     const q = new URLSearchParams(location.search);
     if (q.get('order')) {
       const id = q.get('order');

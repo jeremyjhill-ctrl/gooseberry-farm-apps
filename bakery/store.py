@@ -294,6 +294,7 @@ def public_shop(state, now):
                    if app_pay_open(s) else None),
         "ordering": ordering_status(state, now),
         "items": [{"id": i["id"], "name": i["name"], "description": i.get("description", ""), "price": i["price"],
+                   "details": i.get("details", ""), "contains": i.get("contains", ""),
                    "image": i.get("image", ""), "remaining": remaining(state, i, now)}
                   for i in state["items"] if i.get("active")],
         "pickups": public_pickups(state, now),
@@ -515,6 +516,11 @@ def admin_action(state, a, now):
             state["items"].append(item)
         item["name"] = clean(v.get("name"), 80)
         item["description"] = clean(v.get("description"), 400)
+        if "details" in v:
+            item["details"] = clean(v.get("details"), 2000)
+        if "contains" in v:
+            # "coconut, eggs" (a leading "Contains:" is dropped so it isn't said twice)
+            item["contains"] = re.sub(r"^contains\s*:?\s*", "", clean(v.get("contains"), 120), flags=re.I)
         item["price"] = price
         item["limit"] = opt_int(v.get("limit"))
         if "active" in v:

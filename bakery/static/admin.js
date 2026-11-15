@@ -103,7 +103,9 @@ window.Admin = (function () {
         ${d.image ? '<button type="button" class="btn link small" data-rmphoto>Remove photo</button>' : ''}
         <div class="muted small" style="margin-top:6px">A square-ish or landscape photo looks best.</div></div></div>
       <label class="field"><span>Name</span><input type="text" name="name" value="${h(d.name)}" maxlength="80" required /></label>
-      <label class="field"><span>Description</span><textarea name="description" maxlength="400">${h(d.description)}</textarea></label>
+      <label class="field"><span>Short description</span><textarea name="description" maxlength="400" rows="2">${h(d.description)}</textarea><small>One line on the menu card, e.g. “Whole 9-inch pie.”</small></label>
+      <label class="field"><span>Full description <span class="muted">(optional)</span></span><textarea name="details" maxlength="2000" rows="5" placeholder="Tell customers why they’ll love it.">${h(d.details || '')}</textarea><small>Shown when a customer taps the item. Press Return for a new paragraph.</small></label>
+      <label class="field"><span>Contains <span class="muted">(optional)</span></span><input type="text" name="contains" maxlength="120" value="${h(d.contains || '')}" placeholder="e.g. coconut, eggs" /><small>Shown as a tag on the menu card so allergies are easy to spot.</small></label>
       <div class="grid2">
         <label class="field"><span>Price ($)</span><input type="number" name="price" inputmode="decimal" step="0.01" min="0.5" value="${d.price}" required /></label>
         <label class="field"><span>How many can you make?</span><input type="number" name="limit" inputmode="numeric" min="0" step="1" value="${d.limit == null ? '' : d.limit}" placeholder="No limit" /><small>Leave blank for no limit. It shows "sold out" when they're gone.</small></label>
@@ -317,7 +319,7 @@ window.Admin = (function () {
       else if ('copy' in d) copyBakeList();
       else if (d.markPaid) { await run({ action: 'markPaid', id: d.markPaid }, 'Marked paid'); render(); }
       else if (d.editItem) { const i = st.items.find((x) => x.id === d.editItem); editing = { kind: 'item', id: i.id, draft: { ...i, price: (i.price / 100).toFixed(2) } }; render(); }
-      else if ('addItem' in d) { editing = { kind: 'item', id: null, draft: { name: '', description: '', price: '', limit: null, active: true, image: '' } }; render(); }
+      else if ('addItem' in d) { editing = { kind: 'item', id: null, draft: { name: '', description: '', details: '', contains: '', price: '', limit: null, active: true, image: '' } }; render(); }
       else if (d.editPickup) { const p = st.pickups.find((x) => x.id === d.editPickup); editing = { kind: 'pickup', id: p.id, draft: { ...p, windows: (p.windows || []).map((w) => ({ ...w })) } }; render(); }
       else if ('addPickup' in d) { editing = { kind: 'pickup', id: null, draft: { label: '', details: '', capacity: null, active: true, windows: [] } }; render(); }
       else if ('addWindow' in d) addWindow();

@@ -179,6 +179,14 @@ api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"lowStoc
 _, shop = api("GET", "api/shop")
 check("Mollie can set when 'Only X left' shows", shop["settings"].get("lowStockAt") == 3, shop["settings"].get("lowStockAt"))
 
+# ---- full descriptions and allergen tags
+code, _ = api("POST", "api/admin/action", {"action": "saveItem", "item": {"id": "choc", "name": "Chocolate Pie", "description": "Whole 9-inch pie.", "price": "35",
+    "details": "Decadent and rich.\nMost people don't believe it's dairy-free!", "contains": "Contains: coconut", "active": True}})
+_, shop = api("GET", "api/shop")
+choc = next(i for i in shop["items"] if i["id"] == "choc")
+check("item full description saved with its paragraphs", code == 200 and choc["details"].startswith("Decadent and rich.\nMost"), choc)
+check("allergen tag saved without a doubled 'Contains'", choc["contains"] == "coconut", choc.get("contains"))
+
 other = Client(wsgi.application)
 code, _ = api("GET", "api/admin/state", client=other)
 check("someone else isn't signed in", code == 401)
