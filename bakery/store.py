@@ -171,6 +171,95 @@ def remaining(state, item, now):
     return max(0, item["limit"] - reserved(state, item["id"], now))
 
 
+# ---------------------------------------------------------------- pickup windows
+# A pickup place can offer dated time windows ("Wed, Nov 25, 9-11am"). Customers pick one.
+# Dates and times are the shop's local wall-clock time (settings.timezone).
+
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _hm(t):
+    m = re.match(r"^(\d{1,2}):(\d{2})$", str(t or "").strip())
+    if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+        return None
+    return int(m.group(1)), int(m.group(2))
+
+
+def _clock(hm, with_ampm=True):
+    hh, mm = hm
+    h12 = hh % 12 or 12
+    text = str(h12) if mm == 0 else "{}:{:02d}".format(h12, mm)
+    return text + (("am" if hh < 12 else "pm") if with_ampm else "")
+
+
+def window_label(w):
+    """'Wed, Nov 25, 9-11am' (or '11am-1pm' when the window crosses noon)."""
+    try:
+        d = dt.date(*[int(x) for x in w["date"].split("-")])
+        day = "{}, {} {}".format(d.strftime("%a"), d.strftime("%b"), d.day)
+    except (KeyError, ValueError, TypeError):
+        day = str(w.get("date") or "")
+    a, b = _hm(w.get("start")), _hm(w.get("end"))
+    if not a:
+        return day
+    if not b:
+        return "{}, from {}".format(day, _clock(a))
+    same = (a[0] < 12) == (b[0] < 12)
+    return "{}, {}\u2013{}".format(day, _clock(a, not same), _clock(b))
+
+
+def window_start(w):
+    return "{}T{}".format(w.get("date") or "", (w.get("start") or "00:00").zfill(5))
+
+
+def window_end_ms(w, tz_name):
+    """When the window closes, in epoch ms (end of that day if it has no end time)."""
+    try:
+        y, mo, d = [int(x) for x in w["date"].split("-")]
+    except (KeyError, ValueError, TypeError):
+        return None
+    hh, mm = _hm(w.get("end")) or (23, 59)
+    local = dt.datetime(y, mo, d, hh, mm)
+    try:
+        from zoneinfo import ZoneInfo
+        local = local.replace(tzinfo=ZoneInfo(tz_name or "America/Chicago"))
+    except Exception:  # no time zone data: assume Central standard time
+        local = local.replace(tzinfo=dt.timezone(dt.timedelta(hours=-6)))
+    return int(local.timestamp() * 1000)
+
+
+def window_open(w, s, now):
+    end = window_end_ms(w, s.get("timezone"))
+    return w.get("active", True) and end is not None and now < end
+
+
+def window_taken(state, window_id, now):
+    s = state["settings"]
+    return len([o for o in state["orders"]
+                if o.get("season") == s["season"] and o.get("pickupWindowId") == window_id and holds(o, s, now)])
+
+
+def clean_windows(raw, old):
+    known = {w["id"] for w in (old or [])}
+    out = []
+    for w in (raw if isinstance(raw, list) else [])[:80]:
+        w = w if isinstance(w, dict) else {}
+        date, start, end = clean(w.get("date"), 10), clean(w.get("start"), 5), clean(w.get("end"), 5)
+        if not (date or start or end):
+            continue  # an empty row nobody filled in
+        if not DATE_RE.match(date):
+            raise UserError("Each pickup window needs a date.")
+        if not _hm(start) or not _hm(end):
+            raise UserError("Each pickup window needs a start and an end time.")
+        if _hm(end) <= _hm(start):
+            raise UserError("The window starting {} ends before it starts.".format(window_label({"date": date, "start": start})))
+        out.append({"id": w.get("id") if w.get("id") in known else uid(6), "date": date,
+                    "start": "{:02d}:{:02d}".format(*_hm(start)), "end": "{:02d}:{:02d}".format(*_hm(end)),
+                    "capacity": opt_int(w.get("capacity")), "active": True})
+    out.sort(key=window_start)
+    return out
+
+
 def pickup_taken(state, pickup_id, now):
     s = state["settings"]
     return len([o for o in state["orders"]
@@ -206,10 +295,25 @@ def public_shop(state, now):
         "items": [{"id": i["id"], "name": i["name"], "description": i.get("description", ""), "price": i["price"],
                    "image": i.get("image", ""), "remaining": remaining(state, i, now)}
                   for i in state["items"] if i.get("active")],
-        "pickups": [{"id": p["id"], "label": p["label"], "details": p.get("details", ""),
-                     "full": p.get("capacity") is not None and pickup_taken(state, p["id"], now) >= p["capacity"]}
-                    for p in state["pickups"] if p.get("active")],
+        "pickups": public_pickups(state, now),
     }
+
+
+def public_pickups(state, now):
+    s = state["settings"]
+    out = []
+    for p in state["pickups"]:
+        if not p.get("active"):
+            continue
+        full = p.get("capacity") is not None and pickup_taken(state, p["id"], now) >= p["capacity"]
+        wins = [{"id": w["id"], "label": window_label(w), "start": window_start(w),
+                 "full": full or (w.get("capacity") is not None and window_taken(state, w["id"], now) >= w["capacity"])}
+                for w in p.get("windows") or [] if window_open(w, s, now)]
+        if p.get("windows") and not wins:
+            continue  # every window has passed
+        out.append({"id": p["id"], "label": p["label"], "details": p.get("details", ""), "full": full,
+                    "windows": wins})
+    return out
 
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -237,6 +341,15 @@ def build_order(state, data, now):
         raise UserError("Please choose a pickup option.")
     if pickup.get("capacity") is not None and pickup_taken(state, pickup["id"], now) >= pickup["capacity"]:
         raise UserError(pickup["label"] + " is full. Please choose another pickup option.")
+    window = None
+    if pickup.get("windows"):
+        window = next((w for w in pickup["windows"] if w["id"] == data.get("pickupWindowId")), None)
+        if not window:
+            raise UserError("Please choose a pickup time.")
+        if not window_open(window, s, now):
+            raise UserError("That pickup time has passed. Please choose another.")
+        if window.get("capacity") is not None and window_taken(state, window["id"], now) >= window["capacity"]:
+            raise UserError("That pickup time just filled up. Please choose another.")
 
     lines = []
     most = s.get("perOrderMax") or 12
@@ -277,7 +390,10 @@ def build_order(state, data, now):
         "pickupId": pickup["id"],
         "pickupLabel": pickup["label"],
         "pickupDetails": pickup.get("details", ""),
-        "pickupTime": clean(data.get("pickupTime"), 60) if s.get("askPickupTime") else "",
+        "pickupWindowId": window["id"] if window else "",
+        "pickupWhen": window_label(window) if window else "",
+        "pickupStart": window_start(window) if window else "",
+        "pickupTime": clean(data.get("pickupTime"), 60) if s.get("askPickupTime") and not window else "",
         "allergyNote": clean(data.get("allergyNote"), 500) if s.get("askAllergies") else "",
         "lines": lines,
         "subtotal": subtotal,
@@ -338,6 +454,7 @@ def public_order(o, s=None):
         "id": o["id"], "number": o["number"], "status": o["status"], "payMethod": o.get("payMethod") or "card",
         "name": o["customer"]["name"], "email": o["customer"]["email"],
         "pickupLabel": o["pickupLabel"], "pickupDetails": o.get("pickupDetails", ""), "pickupTime": o.get("pickupTime", ""),
+        "pickupWhen": o.get("pickupWhen", ""),
         "lines": o["lines"], "subtotal": o.get("subtotal") or o["total"], "discount": o.get("discount") or 0, "total": o["total"],
     }
     if o["status"] == "awaiting" and s:
@@ -426,6 +543,8 @@ def admin_action(state, a, now):
         p["label"] = clean(v.get("label"), 80)
         p["details"] = clean(v.get("details"), 200)
         p["capacity"] = opt_int(v.get("capacity"))
+        if "windows" in v:
+            p["windows"] = clean_windows(v.get("windows"), p.get("windows"))
         if "active" in v:
             p["active"] = bool(v["active"])
         return {"id": p["id"]}
@@ -485,7 +604,7 @@ def summarize(state, season, now=None):
 
 
 def orders_csv(state, season):
-    orders = summarize(state, season)["orders"]
+    orders = sorted(summarize(state, season)["orders"], key=lambda o: (o.get("pickupStart") or "~", o["number"]))
     names = []
     for o in orders:
         for l in o["lines"]:
@@ -501,7 +620,7 @@ def orders_csv(state, season):
     for o in orders:
         counts = [sum(l["qty"] for l in o["lines"] if l["name"] == n) or "" for n in names]
         rows.append([o["number"], o["customer"]["name"], o["customer"]["email"], o["customer"]["phone"],
-                     o["pickupLabel"], o.get("pickupTime", ""), o.get("allergyNote", "")] + counts +
+                     o["pickupLabel"], o.get("pickupWhen") or o.get("pickupTime", ""), o.get("allergyNote", "")] + counts +
                     ["{:.2f}".format(o["discount"] / 100) if o.get("discount") else "", "{:.2f}".format(o["total"] / 100),
                      "App (Venmo/Cash App/PayPal)" if o.get("payMethod") == "app" else "Card",
                      "yes" if o.get("pickedUp") else "", o.get("paidAt", "")])

@@ -46,7 +46,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.15; m
 label.field { display: block; margin-bottom: 14px; }
 label.field > span { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
 label.field > small { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
-input[type='text'], input[type='email'], input[type='tel'], input[type='number'], input[type='password'], input[type='datetime-local'], textarea, select {
+input[type='text'], input[type='email'], input[type='tel'], input[type='number'], input[type='password'], input[type='datetime-local'], input[type='date'], input[type='time'], textarea, select {
   width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 16px;
 }
 input:focus, textarea:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(122, 46, 74, 0.25); outline-offset: 1px; border-color: var(--berry); }
@@ -192,3 +192,14 @@ table.bake td.n b { font-size: 17px; }
 .memo { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--cream); border-radius: 12px; padding: 10px 12px; text-align: left; margin-bottom: 8px; }
 .pill.berry { background: var(--berry-soft); color: var(--berry-dark); }
 .awaiting-box { border: 1.5px dashed var(--gold); background: #fffaf0; }
+
+/* pickup windows (admin) */
+.windows { display: grid; gap: 10px; margin-bottom: 10px; }
+.win { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.win label { display: grid; gap: 3px; font-size: 13px; }
+.win label:first-child { grid-column: 1 / -1; }
+.win input { width: 100%; min-width: 0; }
+.win button { justify-self: start; align-self: end; }
+/* pickup choice (customer) */
+.pickup-select { width: 100%; font-size: 16px; }
+.pickup-where { margin-top: 8px; }

@@ -367,14 +367,21 @@
         row.byPickup[o.pickupLabel] = (row.byPickup[o.pickupLabel] || 0) + l.qty;
       }
     const pickups = [...new Set(orders.map((o) => o.pickupLabel))];
+    // Order-list groups: one per pickup window (in time order), or per place when it has no windows.
+    const slots = [...new Set(orders.slice().sort((a, b) => ((a.pickupStart || '~') < (b.pickupStart || '~') ? -1 : (a.pickupStart || '~') > (b.pickupStart || '~') ? 1 : 0)).map(slotOf))];
     return {
       orders,
       awaiting,
       pickups,
+      slots,
       bakeList: Object.values(items),
       revenue: orders.reduce((t, o) => t + o.total, 0),
       seasons: [...new Set(state.orders.map((o) => o.season))]
     };
+  }
+
+  function slotOf(o) {
+    return o.pickupWhen ? `${o.pickupWhen} · ${o.pickupLabel}` : o.pickupLabel;
   }
 
   function ordersCsv(state, season) {
@@ -383,12 +390,12 @@
     const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const head = ['Order #', 'Name', 'Email', 'Phone', 'Pickup', 'Pickup time', 'Allergies', ...itemNames, 'Discount', 'Total', 'Paid by', 'Picked up', 'Paid at'];
     const rows = orders.map((o) => [
-      o.number, o.customer.name, o.customer.email, o.customer.phone, o.pickupLabel, o.pickupTime, o.allergyNote,
+      o.number, o.customer.name, o.customer.email, o.customer.phone, o.pickupLabel, o.pickupWhen || o.pickupTime, o.allergyNote,
       ...itemNames.map((n) => o.lines.filter((l) => l.name === n).reduce((t, l) => t + l.qty, 0) || ''),
       o.discount ? (o.discount / 100).toFixed(2) : '', (o.total / 100).toFixed(2), o.payMethod === 'app' ? 'App (Venmo/Cash App/PayPal)' : 'Card', o.pickedUp ? 'yes' : '', o.paidAt
     ]);
     return [head, ...rows].map((r) => r.map(esc).join(',')).join('\n');
   }
 
-  return { uid, defaultState, normalize, appLinks, holdUntil, money, publicShop, buildOrder, markPaid, publicOrder, adminAction, summarize, ordersCsv, remaining, holds };
+  return { uid, defaultState, normalize, appLinks, holdUntil, money, publicShop, buildOrder, markPaid, publicOrder, adminAction, summarize, slotOf, ordersCsv, remaining, holds };
 });

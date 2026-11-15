@@ -36,7 +36,10 @@ def _lines(o):
 
 
 def _pickup(o):
-    text = "Pickup: {}".format(o["pickupLabel"])
+    if o.get("pickupWhen"):
+        text = "Pickup: {}\n  {}".format(o["pickupWhen"], o["pickupLabel"])
+    else:
+        text = "Pickup: {}".format(o["pickupLabel"])
     if o.get("pickupDetails"):
         text += "\n  {}".format(o["pickupDetails"])
     if o.get("pickupTime"):

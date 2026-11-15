@@ -53,9 +53,9 @@ window.Admin = (function () {
         ${sum.bakeList.map((r) => `<tr><td>${h(r.name)}</td>${sum.pickups.map((p) => `<td class="n">${r.byPickup[p] || '–'}</td>`).join('')}<td class="n"><b>${r.total}</b></td></tr>`).join('')}
         </tbody></table></div>`
       : '<p class="empty">No paid orders yet.</p>';
-    const groups = sum.pickups
+    const groups = sum.slots
       .map((p) => {
-        const os = sum.orders.filter((o) => o.pickupLabel === p).sort((a, b) => a.customer.name.localeCompare(b.customer.name));
+        const os = sum.orders.filter((o) => StoreCore.slotOf(o) === p).sort((a, b) => a.customer.name.localeCompare(b.customer.name));
         const done = os.filter((o) => o.pickedUp).length;
         return `<div class="group-title">${h(p)} <span class="muted small">${done}/${os.length} picked up</span></div>${os.map(orderCard).join('')}`;
       })
@@ -73,7 +73,7 @@ window.Admin = (function () {
     const tel = o.customer.phone.replace(/[^\d+]/g, '');
     return `<div class="order">
       <div class="top"><div class="who"><b>${h(o.customer.name)}</b> <span class="muted small">#${o.number}</span>
-        <div class="meta"><a href="tel:${h(tel)}">${h(o.customer.phone)}</a> · ${h(o.pickupLabel)}</div></div>
+        <div class="meta"><a href="tel:${h(tel)}">${h(o.customer.phone)}</a> · ${h(StoreCore.slotOf(o))}</div></div>
         <b>${money(o.total)}</b></div>
       <ul>${o.lines.map((l) => `<li>${l.qty} × ${h(l.name)}</li>`).join('')}</ul>
       <div class="meta" style="margin-top:6px">${o.overdue ? '<span class="pill warn" style="margin:0">Past due, items released</span>' : `Pay by ${h(fmtDate(o.payBy, st.settings.timezone, true))}`}</div>
@@ -116,11 +116,47 @@ window.Admin = (function () {
   function pickupEditor(d) {
     return `<form class="editor" data-form="pickup">
       <label class="field"><span>Name</span><input type="text" name="label" value="${h(d.label)}" maxlength="80" required placeholder="e.g. Gooseberry Bridge Farm" /></label>
-      <label class="field"><span>Where & when</span><input type="text" name="details" value="${h(d.details)}" maxlength="200" placeholder="Address · day · hours" /></label>
-      <label class="field"><span>Max orders for this pickup</span><input type="number" name="capacity" min="0" step="1" value="${d.capacity == null ? '' : d.capacity}" placeholder="No limit" /><small>Leave blank for no limit.</small></label>
+      <label class="field"><span>Address & details</span><input type="text" name="details" value="${h(d.details)}" maxlength="200" placeholder="e.g. 177 Elm Grove Rd, Rogersville" /><small>${(d.windows || []).length ? 'Shown under the pickup time customers choose.' : 'Without pickup windows, include the day and hours here.'}</small></label>
+      <div class="field"><span>Pickup windows</span><small>Customers choose one window. Leave this empty to offer the place without set times.</small></div>
+      <div class="windows">${(d.windows || []).map(windowRow).join('')}</div>
+      <button class="btn ghost small" type="button" data-add-window style="margin-bottom:14px">+ Add window</button>
+      <label class="field"><span>Max orders for this place</span><input type="number" name="capacity" min="0" step="1" value="${d.capacity == null ? '' : d.capacity}" placeholder="No limit" /><small>Leave blank for no limit.</small></label>
       <label class="switch"><input type="checkbox" name="active" ${d.active ? 'checked' : ''} /> Offer this pickup</label>
       ${editorButtons(d.id)}
     </form>`;
+  }
+
+  function windowRow(w, i) {
+    return `<div class="win">
+      <label><span>Date</span><input type="date" data-w="${i}" data-f="date" value="${h(w.date || '')}" /></label>
+      <label><span>From</span><input type="time" data-w="${i}" data-f="start" step="900" value="${h(w.start || '')}" /></label>
+      <label><span>To</span><input type="time" data-w="${i}" data-f="end" step="900" value="${h(w.end || '')}" /></label>
+      <label><span>Max orders</span><input type="number" data-w="${i}" data-f="capacity" min="0" step="1" inputmode="numeric" placeholder="No limit" value="${w.capacity == null ? '' : w.capacity}" /></label>
+      <button class="btn link small" type="button" data-rm-window="${i}" aria-label="Remove this window" style="color:var(--danger)">Remove</button>
+    </div>`;
+  }
+
+  // Same wording customers see: "Wed, Nov 25, 9–11am".
+  function windowLabel(w) {
+    const [y, m, d] = String(w.date || '').split('-').map(Number);
+    const day = y ? new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d))) : '';
+    const hm = (t) => (/^\d{1,2}:\d{2}$/.test(t || '') ? t.split(':').map(Number) : null);
+    const clock = ([hh, mm], ampm) => `${hh % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ampm ? (hh < 12 ? 'am' : 'pm') : ''}`;
+    const a = hm(w.start), b = hm(w.end);
+    if (!a) return day;
+    if (!b) return `${day}, from ${clock(a, true)}`;
+    const same = (a[0] < 12) === (b[0] < 12);
+    return `${day}, ${clock(a, !same)}–${clock(b, true)}`;
+  }
+
+  function addWindow() {
+    syncDraft();
+    const ws = (editing.draft.windows = editing.draft.windows || []);
+    const last = ws[ws.length - 1];
+    const plus2 = (t) => { const [hh, mm] = t.split(':').map(Number); const e = Math.min(hh * 60 + mm + 120, 23 * 60 + 45); return `${String(Math.floor(e / 60)).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`; };
+    if (last && last.end) ws.push({ date: last.date, start: last.end, end: plus2(last.end), capacity: last.capacity });
+    else ws.push({ date: last ? last.date : '', start: '09:00', end: '11:00', capacity: null });
+    render();
   }
 
   function editorButtons(id) {
@@ -153,7 +189,11 @@ window.Admin = (function () {
         if (editing && editing.kind === 'pickup' && editing.id === p.id) return pickupEditor(editing.draft);
         const n = st.orders.filter((o) => o.season === st.settings.season && o.pickupId === p.id && o.status === 'paid').length;
         return `<div class="item-row"><div class="mover"><button data-move-pickup="${p.id}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} aria-label="Move up">▲</button><button data-move-pickup="${p.id}" data-dir="1" ${idx === st.pickups.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button></div>
-          <div class="info"><b>${h(p.label)}${p.active ? '' : '<span class="pill">Off</span>'}</b><span>${h(p.details)}</span><br /><span>${n} order${n === 1 ? '' : 's'}${p.capacity == null ? '' : ` of ${p.capacity} max`}</span></div>
+          <div class="info"><b>${h(p.label)}${p.active ? '' : '<span class="pill">Off</span>'}</b><span>${h(p.details)}</span><br /><span>${n} order${n === 1 ? '' : 's'}${p.capacity == null ? '' : ` of ${p.capacity} max`}</span>
+          ${(p.windows || []).map((w) => {
+            const k = st.orders.filter((o) => o.season === st.settings.season && o.pickupWindowId === w.id && o.status === 'paid').length;
+            return `<br /><span class="small">${h(windowLabel(w))} · ${k}${w.capacity == null ? '' : ` of ${w.capacity}`} order${k === 1 && w.capacity == null ? '' : 's'}</span>`;
+          }).join('')}</div>
           <button class="btn ghost small" data-edit-pickup="${p.id}">Edit</button></div>`;
       })
       .join('');
@@ -277,8 +317,10 @@ window.Admin = (function () {
       else if (d.markPaid) { await run({ action: 'markPaid', id: d.markPaid }, 'Marked paid'); render(); }
       else if (d.editItem) { const i = st.items.find((x) => x.id === d.editItem); editing = { kind: 'item', id: i.id, draft: { ...i, price: (i.price / 100).toFixed(2) } }; render(); }
       else if ('addItem' in d) { editing = { kind: 'item', id: null, draft: { name: '', description: '', price: '', limit: null, active: true, image: '' } }; render(); }
-      else if (d.editPickup) { const p = st.pickups.find((x) => x.id === d.editPickup); editing = { kind: 'pickup', id: p.id, draft: { ...p } }; render(); }
-      else if ('addPickup' in d) { editing = { kind: 'pickup', id: null, draft: { label: '', details: '', capacity: null, active: true } }; render(); }
+      else if (d.editPickup) { const p = st.pickups.find((x) => x.id === d.editPickup); editing = { kind: 'pickup', id: p.id, draft: { ...p, windows: (p.windows || []).map((w) => ({ ...w })) } }; render(); }
+      else if ('addPickup' in d) { editing = { kind: 'pickup', id: null, draft: { label: '', details: '', capacity: null, active: true, windows: [] } }; render(); }
+      else if ('addWindow' in d) addWindow();
+      else if (d.rmWindow) { syncDraft(); editing.draft.windows.splice(Number(d.rmWindow), 1); render(); }
       else if ('cancelEdit' in d) { editing = null; render(); }
       else if ('rmphoto' in d) { syncDraft(); editing.draft.image = ''; render(); }
       else if (d.moveItem) { await run({ action: 'moveItem', id: d.moveItem, dir: Number(d.dir) }); render(); }
@@ -296,8 +338,13 @@ window.Admin = (function () {
         render();
       } else if ('resetDemo' in d) { window.DemoBackend.reset(); await refresh(); render(); toast('Demo reset'); }
     };
+    el.oninput = (e) => {
+      const t = e.target;
+      if (t.dataset.w != null && editing && editing.draft.windows) editing.draft.windows[Number(t.dataset.w)][t.dataset.f] = t.value;
+    };
     el.onchange = async (e) => {
       const t = e.target;
+      if (t.dataset.w != null) return el.oninput(e);
       if (t.dataset.picked) { await run({ action: 'setPickedUp', id: t.dataset.picked, pickedUp: t.checked }); render(); }
       else if ('season' in t.dataset) { season = t.value; render(); }
       else if ('photo' in t.dataset && t.files[0]) {
@@ -323,7 +370,7 @@ window.Admin = (function () {
           await run({ action: 'saveItem', item: { ...v, id: editing.id, image: editing.draft.image } }, 'Saved');
           editing = null;
         } else if (kind === 'pickup') {
-          await run({ action: 'savePickup', pickup: { ...v, id: editing.id } }, 'Saved');
+          await run({ action: 'savePickup', pickup: { ...v, id: editing.id, windows: editing.draft.windows || [] } }, 'Saved');
           editing = null;
         }
       } catch {
@@ -344,9 +391,9 @@ window.Admin = (function () {
     const sum = StoreCore.summarize(st, season);
     let text = `${season} bake list\n`;
     for (const r of sum.bakeList) text += `${r.total} × ${r.name}${sum.pickups.length > 1 ? ' (' + sum.pickups.map((p) => `${p}: ${r.byPickup[p] || 0}`).join(', ') + ')' : ''}\n`;
-    for (const p of sum.pickups) {
+    for (const p of sum.slots) {
       text += `\n${p}\n`;
-      for (const o of sum.orders.filter((x) => x.pickupLabel === p))
+      for (const o of sum.orders.filter((x) => StoreCore.slotOf(x) === p))
         text += `- ${o.customer.name} (${o.customer.phone}): ${o.lines.map((l) => `${l.qty} ${l.name}`).join(', ')}${o.allergyNote ? ' | ALLERGY: ' + o.allergyNote : ''}\n`;
     }
     try {

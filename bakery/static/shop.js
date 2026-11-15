@@ -3,7 +3,7 @@ window.Shop = (function () {
   const app = () => document.getElementById('app');
   let data = null;
   let cart = store.get('mfb_cart', {});
-  let form = Object.assign({ name: '', email: '', phone: '', pickupId: '', pickupTime: '', allergyNote: '', payMethod: 'card' }, store.get('mfb_form', {}));
+  let form = Object.assign({ name: '', email: '', phone: '', pickupId: '', pickupWindowId: '', pickupTime: '', allergyNote: '', payMethod: 'card' }, store.get('mfb_form', {}));
   let sheetOpen = false;
   let busy = false;
   let error = '';
@@ -76,9 +76,45 @@ window.Shop = (function () {
     </article>`;
   }
 
+  // Pickup choices. When any place has dated windows, customers pick from one list in time order.
+  function usesWindows() {
+    return data.pickups.some((p) => p.windows && p.windows.length);
+  }
+
+  function pickupChoices() {
+    const out = [];
+    for (const p of data.pickups) {
+      if (p.windows && p.windows.length)
+        for (const w of p.windows) out.push({ value: `${p.id}|${w.id}`, text: `${w.label} · ${p.label}`, full: w.full, place: p, start: w.start });
+      else out.push({ value: `${p.id}|`, text: p.label, full: p.full, place: p, start: '~' });
+    }
+    return out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0)); // plain order: '~' (no window) sorts last
+  }
+
+  function chosenPickup() {
+    return pickupChoices().find((c) => c.value === `${form.pickupId}|${form.pickupWindowId || ''}` && !c.full) || null;
+  }
+
+  function pickupPicker() {
+    const choices = pickupChoices();
+    const chosen = chosenPickup();
+    const open = choices.filter((c) => !c.full);
+    return `<select name="pickupChoice" class="pickup-select" aria-label="Pickup time and place">
+        ${open.length === 1 ? '' : `<option value="" ${chosen ? '' : 'selected'}>Choose a pickup time…</option>`}
+        ${choices.map((c) => `<option value="${h(c.value)}" ${chosen && chosen.value === c.value ? 'selected' : ''} ${c.full ? 'disabled' : ''}>${h(c.text)}${c.full ? ' (full)' : ''}</option>`).join('')}
+      </select>
+      ${chosen && chosen.place.details ? `<div class="pickbox pickup-where"><b>${h(chosen.place.label)}</b><br /><span class="muted">${h(chosen.place.details)}</span></div>` : ''}`;
+  }
+
   function sheet() {
     const s = data.settings;
     const ls = lines();
+    if (usesWindows() && !chosenPickup()) {
+      const open = pickupChoices().filter((c) => !c.full);
+      if (open.length === 1) [form.pickupId, form.pickupWindowId] = open[0].value.split('|');
+    }
+    const chosen = usesWindows() ? chosenPickup() : null;
+    const askTime = s.askPickupTime && (!usesWindows() || (chosen && !(chosen.place.windows || []).length));
     const pickups = data.pickups
       .map((p) => {
         const on = form.pickupId === p.id;
@@ -99,8 +135,8 @@ window.Shop = (function () {
             : '<p class="empty">Your order is empty.</p>'
         }
         <div class="section-title">Pickup</div>
-        <div class="pickups">${pickups}</div>
-        ${s.askPickupTime ? `<label class="field" style="margin-top:12px"><span>Estimated pickup time <span class="muted">(optional)</span></span><input type="text" name="pickupTime" maxlength="60" placeholder="e.g. around 11am" value="${h(form.pickupTime)}" /></label>` : ''}
+        ${usesWindows() ? pickupPicker() : `<div class="pickups">${pickups}</div>`}
+        ${askTime ? `<label class="field" style="margin-top:12px"><span>Estimated pickup time <span class="muted">(optional)</span></span><input type="text" name="pickupTime" maxlength="60" placeholder="e.g. around 11am" value="${h(form.pickupTime)}" /></label>` : ''}
         <div class="section-title">Your details</div>
         <label class="field"><span>Name for the order</span><input type="text" name="name" autocomplete="name" required maxlength="80" value="${h(form.name)}" /></label>
         <div class="grid2">
@@ -169,7 +205,7 @@ window.Shop = (function () {
 
   async function submit() {
     error = '';
-    if (!form.pickupId) error = 'Please choose a pickup option.';
+    if (usesWindows() ? !chosenPickup() : !form.pickupId) error = usesWindows() ? 'Please choose a pickup time.' : 'Please choose a pickup option.';
     else if (!form.name.trim()) error = 'Please add a name for the order.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) error = 'Please check your email address.';
     else if (form.phone.replace(/\D/g, '').length < 10) error = 'Please add a phone number Mollie can reach you at.';
@@ -179,6 +215,7 @@ window.Shop = (function () {
     try {
       const res = await api('POST', '/api/checkout', {
         ...form,
+        pickupWindowId: usesWindows() ? form.pickupWindowId : '',
         payMethod: payByApp() ? 'app' : 'card',
         cart: Object.entries(cart).map(([itemId, qty]) => ({ itemId, qty }))
       });
@@ -242,7 +279,7 @@ window.Shop = (function () {
       <div class="total-row"><span>Total</span><span>${money(order.total)}</span></div></div>`;
   }
   function pickupBox(order) {
-    return `<div class="pickbox"><b>Pickup: ${h(order.pickupLabel)}</b><br /><span class="muted">${h(order.pickupDetails)}</span>${order.pickupTime ? `<br /><span class="muted">You said: ${h(order.pickupTime)}</span>` : ''}</div>`;
+    return `<div class="pickbox"><b>Pickup: ${order.pickupWhen ? `${h(order.pickupWhen)}<br />${h(order.pickupLabel)}` : h(order.pickupLabel)}</b><br /><span class="muted">${h(order.pickupDetails)}</span>${order.pickupTime ? `<br /><span class="muted">You said: ${h(order.pickupTime)}</span>` : ''}</div>`;
   }
 
   // Order placed with Venmo / Cash App / PayPal: show exactly what to send and where.
@@ -290,6 +327,16 @@ window.Shop = (function () {
     };
     el.oninput = (e) => {
       const f = e.target;
+      if (f.name === 'pickupChoice') {
+        [form.pickupId, form.pickupWindowId] = (f.value || '|').split('|');
+        error = '';
+        saveLocal();
+        const sh = document.querySelector('.sheet');
+        const top = sh ? sh.scrollTop : 0;
+        render();
+        if (document.querySelector('.sheet')) document.querySelector('.sheet').scrollTop = top;
+        return;
+      }
       if (f.name && f.name in form) {
         form[f.name] = f.value;
         saveLocal();
