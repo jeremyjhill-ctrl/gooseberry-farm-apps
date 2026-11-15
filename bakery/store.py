@@ -89,6 +89,7 @@ def default_state():
             "timezone": "America/Chicago",
             "holdMinutes": 30,
             "perOrderMax": 12,
+            "lowStockAt": 5,  # show "Only X left" at this many or fewer (0 = never)
             "askPickupTime": True,
             "askAllergies": True,
             "allergyPrompt": "Any allergies besides dairy and wheat/gluten? Mollie will reach out if she can't make a modification.",
@@ -286,7 +287,7 @@ def ordering_status(state, now):
 def public_shop(state, now):
     s = state["settings"]
     keys = ["shopName", "season", "tagline", "intro", "dietaryNote", "contactNote", "deadline", "timezone",
-            "perOrderMax", "askPickupTime", "askAllergies", "allergyPrompt"]
+            "perOrderMax", "lowStockAt", "askPickupTime", "askAllergies", "allergyPrompt"]
     return {
         "settings": {k: s.get(k) for k in keys},
         "appPay": ({"discountPct": to_num(s.get("appPayDiscountPct")) or 0, "hours": s.get("appPayHours"), "apps": apps_on(s)}
@@ -490,6 +491,8 @@ def admin_action(state, a, now):
         if "deadline" in v:
             ms = parse_ms(v["deadline"])
             s["deadline"] = iso(ms) if ms is not None else ""
+        if "lowStockAt" in v:
+            s["lowStockAt"] = min(999, max(0, to_int(v["lowStockAt"])))
         if "perOrderMax" in v:
             s["perOrderMax"] = min(99, max(1, to_int(v["perOrderMax"]) or 12))
         if not s.get("shopName"):

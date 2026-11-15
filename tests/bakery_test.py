@@ -174,6 +174,11 @@ check("editing keeps each window's identity", [w["id"] for w in next(p for p in 
 r = c.get("/bakery/api/admin/orders.csv")
 check("spreadsheet shows the window", "Mon, Nov 25, 9\u201311am" in r.get_data(as_text=True))
 
+# ---- low-stock badge setting
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"lowStockAt": "3"}})
+_, shop = api("GET", "api/shop")
+check("Mollie can set when 'Only X left' shows", shop["settings"].get("lowStockAt") == 3, shop["settings"].get("lowStockAt"))
+
 other = Client(wsgi.application)
 code, _ = api("GET", "api/admin/state", client=other)
 check("someone else isn't signed in", code == 401)

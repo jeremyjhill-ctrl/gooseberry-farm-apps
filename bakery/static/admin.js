@@ -223,7 +223,8 @@ window.Admin = (function () {
       ${f('intro', 'Welcome message', 'Shown at the top of the order page. Say what you’re offering, the order deadline, and when and where pickup is. Press Return for a new paragraph.', 'area')}
       ${f('dietaryNote', 'Dietary note', 'Shown in the green box at the top.', 'area')}
       ${f('contactNote', 'Contact line', 'Shown at the bottom of the page.')}
-      <label class="field"><span>Most of one item per order</span><input type="number" name="perOrderMax" min="1" max="99" value="${s.perOrderMax}" /></label>
+      <label class="field"><span>Most of one item per order</span><input type="number" name="perOrderMax" min="1" max="99" value="${s.perOrderMax}" /><small>Customers who reach this see “Limit ${h(s.perOrderMax)} per order. Need more? Contact Mollie.”</small></label>
+      <label class="field"><span>Show “Only X left” at</span><input type="number" name="lowStockAt" min="0" max="999" value="${s.lowStockAt == null ? 5 : s.lowStockAt}" /><small>Items with this many or fewer left show the count. Use 0 to never show it.</small></label>
       <label class="switch"><input type="checkbox" name="askPickupTime" ${s.askPickupTime ? 'checked' : ''} /> Ask for an estimated pickup time</label>
       <label class="switch"><input type="checkbox" name="askAllergies" ${s.askAllergies ? 'checked' : ''} /> Ask about allergies</label>
       ${f('allergyPrompt', 'Allergy question', '', 'area')}

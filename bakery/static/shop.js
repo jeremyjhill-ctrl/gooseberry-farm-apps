@@ -55,12 +55,22 @@ window.Shop = (function () {
     </div>`;
   }
 
+  // Why the + stopped working, shown while they're at the limit.
+  function limitNote(item) {
+    const q = cart[item.id] || 0;
+    if (!q || q < maxFor(item)) return '';
+    const per = data.settings.perOrderMax || 12;
+    return item.remaining != null && item.remaining <= per
+      ? `<p class="limit-note">That’s all we have left.</p>`
+      : `<p class="limit-note">Limit ${per} per order. Need more? Contact Mollie.</p>`;
+  }
+
   function card(item) {
     const open = data.ordering.open;
     const soldOut = item.remaining === 0;
     const badge = soldOut
       ? '<span class="badge out">Sold out</span>'
-      : item.remaining != null && item.remaining <= 10
+      : item.remaining != null && item.remaining <= (data.settings.lowStockAt == null ? 5 : data.settings.lowStockAt)
       ? `<span class="badge">Only ${item.remaining} left</span>`
       : '';
     const q = cart[item.id] || 0;
@@ -72,6 +82,7 @@ window.Shop = (function () {
         <h3>${h(item.name)}</h3>
         <p class="desc">${h(item.description)}</p>
         <div class="row"><span class="price">${money(item.price)}</span>${control}</div>
+        ${open && !soldOut ? limitNote(item) : ''}
       </div>
     </article>`;
   }
@@ -130,7 +141,7 @@ window.Shop = (function () {
         ${
           ls.length
             ? `<div class="lines">${ls
-                .map((l) => `<div class="line"><span class="nm">${h(l.item.name)}</span>${stepper(l.item)}<span class="amt">${money(l.qty * l.item.price)}</span></div>`)
+                .map((l) => `<div class="line"><span class="nm">${h(l.item.name)}</span>${stepper(l.item)}<span class="amt">${money(l.qty * l.item.price)}</span></div>${limitNote(l.item).replace('limit-note', 'limit-note in-sheet')}`)
                 .join('')}${payByApp() && appDiscount() ? `<div class="line"><span class="nm">${h(data.appPay.discountPct)}% off for paying by app</span><span class="amt">−${money(appDiscount())}</span></div>` : ''}<div class="total-row"><span>Total</span><span>${money(due())}</span></div></div>`
             : '<p class="empty">Your order is empty.</p>'
         }
@@ -192,7 +203,6 @@ window.Shop = (function () {
     if (!item) return;
     cart[id] = Math.max(0, Math.min(maxFor(item), (cart[id] || 0) + d));
     if (!cart[id]) delete cart[id];
-    if (d > 0 && cart[id] === maxFor(item) && item.remaining != null && item.remaining === cart[id]) toast(`That's the last of the ${item.name}!`);
     saveLocal();
     error = '';
     const scroll = sheetOpen && document.querySelector('.sheet') ? document.querySelector('.sheet').scrollTop : null;
