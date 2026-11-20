@@ -14,10 +14,8 @@
     <label>Opens (blank = now) <input type="datetime-local" name="starts_at" value="{{ (current.starts_at or '')[:16] if current else '' }}"></label>
     <label>Closes (blank = no end) <input type="datetime-local" name="ends_at" value="{{ (current.ends_at or '')[:16] if current else '' }}"></label>
   </div>
-  <div class="grid" style="grid-template-columns:1fr 1fr">
-    <label class="inline"><input type="checkbox" name="hidden" {{ 'checked' if (current and current.hidden) or not current }}> <span><b>Hidden</b> while you set it up</span></label>
-    <label>Order on the shop page <input type="number" name="sort" value="{{ current.sort if current else 0 }}"></label>
-  </div>
+  <label style="max-width:340px">Order on the shop page (lower first) <input type="number" name="sort" value="{{ current.sort if current else 0 }}"></label>
+  <label class="inline"><input type="checkbox" name="hidden" {{ 'checked' if (current and current.hidden) or not current }}> <span><b>Hidden</b> while you set it up</span></label>
   <div class="row"><button class="btn">Save</button><a href="{{ url_for('admin_pages') }}">Cancel</a></div>
 </form>
 {% endif %}

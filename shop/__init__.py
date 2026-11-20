@@ -37,6 +37,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402
 import farm_mail  # noqa: E402  (real email only when PLAYDATE_EMAILS=on, like the playdate messages)
+import farm_auth as fa  # noqa: E402  (personal logins)
 import farm_passes as fp  # noqa: E402
 
 try:
@@ -102,6 +103,7 @@ def create_app():
     con = connect()
     fp.ensure_schema(con)
     con.close()
+    fa.ensure_schema()
 
     def db():
         if "db" not in g:
@@ -153,7 +155,9 @@ def create_app():
 
     # ------------------------------------------------------------ helpers
     def is_admin():
-        return session.get("shop_admin") is True
+        if fa.accounts_for("shop"):
+            return fa.can(fa.current_user(request), "shop")
+        return session.get("shop_admin") is True  # shared password, until someone has a personal login for the shop
 
     def admin_required(view):
         @wraps(view)
@@ -624,6 +628,8 @@ def create_app():
     # ------------------------------------------------------------ admin
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():
+        if fa.accounts_for("shop"):
+            return redirect(url_for("account_login", next=request.args.get("next") or url_for("admin_home")))
         if request.method == "POST":
             ip = request.remote_addr or ""
             recent = [t for t in login_tries.get(ip, []) if (now() - t).total_seconds() < 600]
@@ -643,7 +649,16 @@ def create_app():
     @app.get("/admin/logout")
     def admin_logout():
         session.pop("shop_admin", None)
+        if request.cookies.get(fa.COOKIE):
+            return redirect(url_for("account_logout"))
         return redirect(url_for("home"))
+
+    def legacy_admin():
+        return session.get("shop_admin") is True and not fa.accounts_for("shop")
+
+    fa.add_pages(app, default_next="/admin", legacy_admin=legacy_admin, legacy_login_endpoint="admin_login", here="shop")
+    app.jinja_env.globals["farm_bar"] = lambda: fa.admin_bar(request, "shop", url_for("account_logins"), url_for("account_password"),
+                                                             url_for("account_logout"), legacy=legacy_admin())
 
     @app.get("/admin")
     @admin_required

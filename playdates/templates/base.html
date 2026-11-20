@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+{% block topbar %}{% endblock %}
 <header class="top"><div class="in">
   <div class="brand"><small>Gooseberry Bridge Farm</small><b>{% block heading %}Farm Baby Playdates{% endblock %}</b></div>
   {% block nav %}{% endblock %}

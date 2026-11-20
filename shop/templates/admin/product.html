@@ -48,10 +48,8 @@
     <label>Most per order (blank = 10) <input type="number" name="per_order_limit" min="1" value="{{ p.per_order_limit if p.per_order_limit is not none else '' }}"></label>
   </div>
   <label>Extra terms the buyer agrees to (optional) <textarea name="terms" rows="2" placeholder="Flower picking depends on the weather and may end early.">{{ p.terms or '' }}</textarea></label>
-  <div class="grid" style="grid-template-columns:1fr 1fr">
-    <label class="inline"><input type="checkbox" name="taxable" {{ 'checked' if p.taxable }}> <span>Charge sales tax</span></label>
-    <label>Order on the page <input type="number" name="sort" value="{{ p.sort or 0 }}"></label>
-  </div>
+  <label style="max-width:340px">Order on the page (lower numbers first) <input type="number" name="sort" value="{{ p.sort or 0 }}"></label>
+  <label class="inline"><input type="checkbox" name="taxable" {{ 'checked' if p.taxable }}> <span>Charge sales tax</span></label>
   <label class="inline"><input type="checkbox" name="hidden" {{ 'checked' if p.hidden }}> <span><b>Hidden</b> (customers can't see or buy it)</span></label>
   <button class="btn big">Save</button>
 </form>

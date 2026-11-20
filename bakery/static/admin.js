@@ -16,18 +16,23 @@ window.Admin = (function () {
   }
 
   // ---------- views ----------
-  function loginView(msg) {
+  async function loginView(msg) {
+    let accounts = false;
+    try { accounts = !window.DemoBackend && (await api('GET', '/api/admin/login-mode')).accounts; } catch (e) {}
     app().innerHTML = `<div class="wrap"><form class="panel login" id="login">
       <h2>Baker login</h2><p class="muted small">For Mollie only.</p>
+      ${accounts ? `<label class="field"><span>Email</span><input type="email" name="email" autocomplete="username" required /></label>` : ''}
       <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required /></label>
       ${msg ? `<div class="form-error">${h(msg)}</div>` : ''}
       <button class="btn block" type="submit">Sign in</button>
+      ${accounts ? `<p class="small" style="text-align:center"><a href="account/forgot">Forgot your password?</a></p>` : ''}
       <p class="small" style="text-align:center"><a href="#">Back to the shop</a></p>
     </form></div>`;
     document.getElementById('login').onsubmit = async (e) => {
       e.preventDefault();
       try {
-        await api('POST', '/api/admin/login', { password: e.target.password.value });
+        const r = await api('POST', '/api/admin/login', { email: e.target.email ? e.target.email.value : '', password: e.target.password.value });
+        if (r && r.mustChange) { location.href = 'account/password?first=1&next=' + encodeURIComponent(location.pathname + '#admin'); return; }
         start();
       } catch (err) {
         loginView(err.message);

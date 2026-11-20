@@ -1298,6 +1298,8 @@ def admin_demo_clear():
 
 init_db()
 
+import farm_auth  # noqa: E402  personal logins (see farm_auth.py); the shared password works until someone has a login
+farm_auth.attach_playdates(sys.modules[__name__])
 import farm_passes  # noqa: E402  pass and gift codes at checkout, and the hide-the-booking-page switch (see farm_passes.py)
 farm_passes.register(sys.modules[__name__])
 

@@ -172,3 +172,4 @@ input,select,textarea{max-width:100%;min-width:0}
 .grid input,.grid select{width:100%}
 .credit .left{white-space:nowrap}
 .sum div span:last-child{white-space:nowrap;padding-left:8px}
+label.inline>span{flex:1 1 auto;min-width:8em}

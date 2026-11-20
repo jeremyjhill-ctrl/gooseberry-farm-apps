@@ -5,7 +5,8 @@ its own photos folder, its own login and its own Stripe keys. With no Stripe key
 demo mode (card orders are marked paid without a payment).
 
 Settings (environment variables):
-  BAKERY_PASSWORD               Mollie's admin password (required unless in demo mode)
+  BAKERY_PASSWORD               old shared admin password. Only used until someone has a personal login with the
+                                Bakery box ticked (made on the farm's Logins page); after that it's ignored.
   BAKERY_SECRET_KEY             long random string that signs her login cookie
   BAKERY_STRIPE_SECRET_KEY      Mollie's Stripe secret key (sk_test_... or sk_live_...)
   BAKERY_STRIPE_WEBHOOK_SECRET  from her Stripe webhook for <site>/api/stripe/webhook
@@ -33,6 +34,7 @@ from . import emails, store
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402  (SQLite file on the Mac, Postgres on Render)
+import farm_auth as fa  # noqa: E402  (personal logins: Mollie gets her own, with only the Bakery box ticked)
 import mailer  # noqa: E402  (same mail code as Pasture Keeper)
 
 
@@ -108,6 +110,7 @@ def create_app():
 
     with changing():
         pass  # creates the file with Mollie's starting menu on first run
+    fa.ensure_schema()
 
     # ---------------------------------------------------------------- helpers
     def fail(e):
@@ -120,6 +123,8 @@ def create_app():
         return request.get_json(silent=True) or {}
 
     def is_admin():
+        if fa.accounts_for("bakery"):  # someone has a personal login for the bakery: only personal logins work
+            return fa.can(fa.current_user(request), "bakery")
         if not password:
             return demo  # no password set: only allowed in demo mode
         return session.get("bakery_admin") is True
@@ -305,8 +310,20 @@ def create_app():
         return jsonify(received=True)
 
     # ---------------------------------------------------------------- Mollie
+    @app.get("/api/admin/login-mode")
+    def login_mode():
+        return jsonify(accounts=fa.accounts_for("bakery"))
+
     @app.post("/api/admin/login")
     def login():
+        if fa.accounts_for("bakery"):
+            u, err = fa.authenticate(body().get("email", ""), str(body().get("password", "")), request.remote_addr or "")
+            if not u:
+                return jsonify(error=err), 401
+            if not fa.can(u, "bakery"):
+                return jsonify(error="That login doesn't have the bakery admin turned on."), 403
+            resp = jsonify(ok=True, mustChange=bool(u["must_change"]))
+            return fa.set_cookie(resp, request, fa.start_login(u))
         if not password:
             return (jsonify(ok=True), 200) if demo else (jsonify(error="Set BAKERY_PASSWORD on the server first."), 403)
         if secrets.compare_digest(str(body().get("password", "")), password):
@@ -318,7 +335,12 @@ def create_app():
     @app.post("/api/admin/logout")
     def logout():
         session.pop("bakery_admin", None)
-        return jsonify(ok=True)
+        fa.end_login(request.cookies.get(fa.COOKIE))
+        return fa.clear_cookie(jsonify(ok=True), request)
+
+    # Forgot / change password pages, in Mollie's colors and name (nothing farm-branded).
+    fa.add_pages(app, brand="Mollie's Farmhouse Bakery", color="#7a2e4a", farm=False, default_next="/#admin",
+                 mailer_from="BAKERY_MAIL_FROM")
 
     @app.get("/api/admin/state")
     def admin_state():

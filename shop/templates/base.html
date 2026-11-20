@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='shop.css') }}">
 </head>
 <body>
+{% block topbar %}{% endblock %}
 {% if is_admin() %}<div class="adminbar noprint"><div class="in"><span>{% if SS.shop_hidden %}<b>The shop is hidden from customers.</b> You're seeing it because you're logged in.{% else %}You're logged in as the farm.{% endif %}</span>
   <span><a href="{{ url_for('admin_home') }}">Shop admin</a> · <a href="{{ url_for('admin_scan') }}">Scan a pass</a></span></div></div>{% endif %}
 <header class="top"><div class="in">

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block heading %}Playdate admin{% endblock %}
 {% block wrapclass %}{% endblock %}
+{% block topbar %}{{ farm_bar() }}{% endblock %}
 {% block nav %}
 <nav aria-label="Admin">
   {% set p = request.path %}
@@ -13,6 +14,5 @@
   <a href="{{ url_for('admin_messages') }}" class="{{ 'on' if p.startswith('/admin/messages') }}">Messages</a>
   <a href="{{ url_for('admin_reports') }}" class="{{ 'on' if p.startswith('/admin/reports') }}">Reports</a>
   <a href="{{ url_for('book') }}">Guest page ↗</a>
-  <a href="{{ shop_admin_url() }}">Farm shop ↗</a>
 </nav>
 {% endblock %}

@@ -39,5 +39,5 @@
   {% else %}<p class="muted" style="margin:0">No orders yet.</p>{% endfor %}
 </section>
 <div class="row"><a class="btn" href="{{ url_for('admin_product', kind='pass') }}">+ New pass bundle</a><a class="btn ghost" href="{{ url_for('admin_product', kind='item') }}">+ New product</a>
-  <a class="btn ghost" href="{{ url_for('admin_pass_new') }}">+ Make a code</a><a class="btn ghost" href="{{ url_for('admin_logout') }}">Log out</a></div>
+  <a class="btn ghost" href="{{ url_for('admin_pass_new') }}">+ Make a code</a></div>
 {% endblock %}

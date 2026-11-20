@@ -78,7 +78,13 @@ if [ -f "$WORK/tests/shop_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$H
   cat /tmp/farm-shop.json; tail -20 /tmp/farm-shop.log
   pause; exit 1
 fi
-echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')."
+rm -f /tmp/farm-logins.json
+if [ -f "$WORK/tests/login_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/login_test.py > /tmp/farm-logins.json 2>/tmp/farm-logins.log); then
+  echo "STOPPED: the personal logins check failed on this delivery, so nothing was published."
+  cat /tmp/farm-logins.json; tail -20 /tmp/farm-logins.log
+  pause; exit 1
+fi
+echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')$([ -f /tmp/farm-logins.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-logins.json"));print(",",d["passed"],"of",d["total"],"logins")' | tr -d '\n')."
 
 echo
 echo "Checking what's on GitHub now..."

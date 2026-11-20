@@ -37,11 +37,25 @@ visible to you while you're logged in, with a banner.
 - `playdate_safety_test.py`: 66 checks covering booking, holds, the declined card, price and tax, adding people, moving,
   check-in, gate sales, stopping and closing days, the calendar, reminders, reports and price presets.
   Passes identically on the original Booking App, this version on the Mac, and this version on Postgres.
-- `shop_test.py`: 94 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows),
+- `shop_test.py`: 107 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows),
   booking playdates with a pass (fully covered, partly covered, refused), gate tick-offs and undo, the seasonal switch,
   credits returned when the farm cancels, hand-made codes, expired / turned-off passes, code-guessing lockout, and hiding
   the shop and the booking page.
 - `bakery_test.py`: checks covering the menu, photos, stock limits, card and app payments, Mollie's admin, and that the two logins stay separate.
+
+- `login_test.py`: 83 checks covering personal logins: setting up the owner login, adding Staci (playdates + shop) and
+  Mollie (bakery only), first-login password change, forgot-password links, turning people off, the shared passwords
+  retiring per app, and that Mollie's login pages never show the farm.
+
+## Logins
+Everyone has their own email + password (playdates/farm_auth.py). The owner ticks what each person can use on
+**Logins** (top bar of either farm admin, `/account/logins`): Playdates, Farm shop, Bakery, Manage logins.
+- Each app keeps taking its old shared password (`ADMIN_PASSWORD` for playdates + shop, `BAKERY_PASSWORD` for the
+  bakery) until at least one person has a personal login for it. Then only personal logins work there.
+- Playdates and the shop share one login; on gooseberrybridge.com addresses it covers booking. and shop. together.
+- Mollie's bakery is on her own address, so she logs in there separately, on pages in her own branding. Her bakery
+  still uses only her own Stripe keys (`BAKERY_STRIPE_*`); logins don't connect the money in any way.
+- Passwords are stored as one-way hashes. Turning someone off, or a password reset, logs them out everywhere.
 
 ## On Render
 Data lives in its own `farm_apps` database on Pasture Keeper's Postgres server (created automatically).
