@@ -299,9 +299,13 @@ def create_app():
 
     def plain(x):
         """120.0 -> 120, 12.5 -> 12.50, for number boxes in the admin."""
-        if x in (None, ""):
+        from jinja2 import Undefined
+        if x is None or isinstance(x, Undefined) or x == "":
+            return ""  # blank on a brand-new product
+        try:
+            x = float(x)
+        except (TypeError, ValueError):
             return ""
-        x = float(x)
         return str(int(x)) if x == int(x) else "{:.2f}".format(x)
 
     app.jinja_env.filters["plain"] = plain

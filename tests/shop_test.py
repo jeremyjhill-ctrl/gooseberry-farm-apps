@@ -318,7 +318,11 @@ r = guest.get("/shop/p/{}".format(bundle["id"]))
 check("ended sale can't be bought", "This sale has ended" in body(r) and "Add to cart" not in body(r))
 
 # ---------------------------------------------------------------- admin pages and reports
-for path in ["/shop/admin", "/shop/admin/products", "/shop/admin/credits", "/shop/admin/pages", "/shop/admin/orders",
+for path in ["/shop/admin/products/new?kind=pass", "/shop/admin/products/new?kind=item", "/shop/admin/products/new",
+             "/shop/admin/credits?edit=new", "/shop/admin/credits?edit={}".format(PLAY), "/shop/admin/pages?edit=new",
+             "/shop/admin/pages?edit={}".format(page["id"]), "/shop/admin/passes/new", "/shop/admin/scan",
+             "/shop/admin/products/{}".format(book["id"]), "/shop/", "/shop/cart", "/shop/s/black-friday-2026",
+             "/shop/admin", "/shop/admin/products", "/shop/admin/credits", "/shop/admin/pages", "/shop/admin/orders",
              "/shop/admin/orders/" + ocode, "/shop/admin/passes", "/shop/admin/passes?q=Miller", "/shop/admin/settings",
              "/shop/admin/products/{}".format(bundle["id"])]:
     r = c.get(path)
