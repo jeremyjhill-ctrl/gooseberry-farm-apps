@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Payment{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<div class="warn" style="font-weight:800;text-align:center">TEST MODE · Stand-in for Stripe · No real card is charged</div>
+<section class="card">
+  <div class="muted">Gooseberry Bridge Farm</div>
+  <div style="font-size:30px;font-weight:700">{{ money(o.total) }}</div>
+  <div class="sum" style="font-size:14px">
+    {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }}</span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
+    {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}
+    <div><span>Sales tax</span><span>{{ money(o.tax) }}</span></div>
+  </div>
+  {% if error %}<div class="flash" style="border-color:var(--red)">{{ error }}</div>{% endif %}
+  <form method="post" style="display:flex;flex-direction:column;gap:12px">
+    <label>Card number <input type="text" name="card" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" required></label>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <label>Expiry <input type="text" name="exp" placeholder="12 / 30"></label>
+      <label>CVC <input type="text" name="cvc" placeholder="123"></label>
+    </div>
+    <button class="btn big" style="background:#635BFF;border-color:#635BFF">Pay {{ money(o.total) }}</button>
+  </form>
+  <div class="muted">Test cards: <strong>4242 4242 4242 4242</strong> succeeds · <strong>4000 0000 0000 0002</strong> is declined.</div>
+</section>
+<a href="{{ url_for('checkout') }}">‹ Back</a>
+{% endblock %}

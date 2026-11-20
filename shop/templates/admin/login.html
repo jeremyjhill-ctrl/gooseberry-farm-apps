@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block heading %}Farm shop admin{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block nav %}{% endblock %}
+{% block body %}
+<form method="post" class="card"><h1>Log in</h1>
+<p class="muted" style="margin:0">Same password as the playdate admin.</p>
+<label>Password <input type="password" name="password" autocomplete="current-password" autofocus required></label>
+<button class="btn big">Log in</button></form>
+{% endblock %}

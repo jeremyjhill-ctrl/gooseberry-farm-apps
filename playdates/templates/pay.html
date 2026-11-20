@@ -2,16 +2,23 @@
 {% block title %}Payment{% endblock %}
 {% block heading %}Checkout{% endblock %}
 {% block body %}
-<div class="test">TEST MODE · Stand-in for Stripe · No real card is charged</div>
+{% if total > 0 %}<div class="test">TEST MODE · Stand-in for Stripe · No real card is charged</div>{% endif %}
 <div class="paybox">
   <div class="muted">Gooseberry Bridge Farm</div>
   <div style="font-size:30px;font-weight:700">{{ money(total) }}</div>
   <div>{{ label }}</div>
   <div class="sum" style="font-size:14px">
+    {% if credit %}<div><span>{{ credit_label }}</span><span>−{{ money(credit) }}</span></div>{% endif %}
     <div><span>Subtotal</span><span>{{ money(sub) }}</span></div>
     <div><span>Sales tax{% if S.tax_mode == 'included' %} (included){% endif %}</span><span>{{ money(tax) }}</span></div>
   </div>
   {% if error %}<div class="flash" style="border-color:var(--red)">{{ error }}</div>{% endif %}
+  {% if total <= 0 %}
+  <form method="post" style="display:flex;flex-direction:column;gap:12px">
+    <p style="margin:0">Your pass covers this booking, so there's nothing to pay.</p>
+    <button class="btn big">Confirm my booking</button>
+  </form>
+  {% else %}
   <form method="post" style="display:flex;flex-direction:column;gap:12px">
     <label>Card number <input type="text" name="card" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" required></label>
     <div class="grid" style="grid-template-columns:1fr 1fr">
@@ -21,6 +28,7 @@
     <button class="btn big" style="background:#635BFF;border-color:#635BFF">Pay {{ money(total) }}</button>
   </form>
   <div class="muted">Test cards: <strong>4242 4242 4242 4242</strong> succeeds · <strong>4000 0000 0000 0002</strong> is declined.</div>
+  {% endif %}
 </div>
 {% if not add %}<a href="{{ url_for('checkout', code=b.code) }}">‹ Back</a>{% else %}<a href="{{ url_for('manage', code=b.code) }}">‹ Back</a>{% endif %}
 {% endblock %}

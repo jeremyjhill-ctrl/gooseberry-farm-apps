@@ -12,6 +12,7 @@
     {% if b.under2 %}<div><div class="muted">Under 2</div><b style="font-size:34px">{{ b.under2 }}</b></div>{% endif %}
     <div><div class="muted">Paid</div><b>{{ money(paid.total) }}</b></div>
   </div>
+  {% for u in pass_uses_for(b) %}<div class="muted">Used {{ u.qty }} × {{ u.name }} from pass {{ u.code }}</div>{% endfor %}
   {% if used_at %}
   <div style="background:var(--red);color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;font-size:18px" role="alert">Already checked in at {{ used_at }}.</div>
   <p style="margin:0;font-size:14px">If this group isn't the one already inside, this ticket may have been shared. Ask for the name on the booking.</p>

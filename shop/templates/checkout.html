@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Checkout{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<a href="{{ url_for('cart_view') }}" style="font-weight:700;text-decoration:none">‹ Back to cart</a>
+{% for e in errors %}<div class="flash" style="border-color:var(--red)">{{ e }}</div>{% endfor %}
+<section class="card sum">
+  <h2>Your order</h2>
+  {% for l in lines %}<div><span>{{ l.qty }} × {{ l.product.name }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
+  {% if t.ships %}<div><span>Shipping</span><span>{{ money(t.shipping) }}</span></div>{% endif %}
+  <div><span>Sales tax</span><span>{{ money(t.tax) }}</span></div>
+  <div class="total"><span>Total</span><span>{{ money(t.total) }}</span></div>
+  {% if t.ships %}<div class="muted"><span>Shipping out of Missouri? Tax comes off the shipped items once you enter your state.</span><span></span></div>{% endif %}
+</section>
+<form method="post" class="card">
+  <h2>Your details</h2>
+  <label>Name <input type="text" name="name" autocomplete="name" value="{{ f.get('name', '') }}" required></label>
+  <label>Email <input type="email" name="email" autocomplete="email" value="{{ f.get('email', '') }}" required></label>
+  <label>Mobile phone (optional) <input type="tel" name="phone" autocomplete="tel" value="{{ f.get('phone', '') }}"></label>
+  {% set passes = lines|selectattr('product.kind', 'equalto', 'pass')|list %}
+  {% if passes %}
+  <h2 style="margin-top:6px">Who are the passes for?</h2>
+  <p class="muted" style="margin:0">Giving one as a gift? Put their name and it'll show on the pass and the printable certificate. Leave it blank if it's for you.</p>
+  {% for l in passes %}{% for i in range(l.qty) %}
+  <label>{{ l.product.name }}{% if l.qty > 1 %} #{{ i + 1 }}{% endif %}: a gift for (optional)
+    <input type="text" name="gift_{{ l.product.id }}_{{ i }}" value="{{ f.get('gift_%s_%s'|format(l.product.id, i), '') }}" placeholder="e.g. The Miller family"></label>
+  {% endfor %}{% endfor %}
+  {% endif %}
+  {% if t.ships %}
+  <h2 style="margin-top:6px">Ship to</h2>
+  <label>Name <input type="text" name="ship_name" autocomplete="shipping name" value="{{ f.get('ship_name', '') }}"></label>
+  <label>Street address <input type="text" name="ship_line1" autocomplete="shipping address-line1" value="{{ f.get('ship_line1', '') }}"></label>
+  <label>Apt, suite (optional) <input type="text" name="ship_line2" autocomplete="shipping address-line2" value="{{ f.get('ship_line2', '') }}"></label>
+  <div class="grid" style="grid-template-columns:2fr 1fr 1fr">
+    <label>City <input type="text" name="ship_city" autocomplete="shipping address-level2" value="{{ f.get('ship_city', '') }}"></label>
+    <label>State <input type="text" name="ship_state" autocomplete="shipping address-level1" maxlength="2" value="{{ f.get('ship_state', '') }}" placeholder="MO" style="text-transform:uppercase"></label>
+    <label>ZIP <input type="text" name="ship_zip" autocomplete="shipping postal-code" inputmode="numeric" value="{{ f.get('ship_zip', '') }}"></label>
+  </div>
+  {% endif %}
+  <h2 style="margin-top:6px">Terms</h2>
+  {% for para in terms %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}
+  <label class="inline"><input type="checkbox" name="agree" required {{ 'checked' if f.get('agree') }}> <span><strong>I agree to these terms</strong></span></label>
+  <button class="btn big">Continue to payment</button>
+  <div class="muted">We'll hold these for 30 minutes while you pay.</div>
+</form>
+{% endblock %}

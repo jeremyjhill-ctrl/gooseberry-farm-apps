@@ -1,0 +1,19 @@
+{% extends "admin/base.html" %}
+{% block title %}Passes & codes{% endblock %}
+{% block body %}
+<div class="row between"><h1>Passes &amp; codes</h1><a class="btn" href="{{ url_for('admin_pass_new') }}">+ Make a code</a></div>
+<form method="get" class="row"><input type="search" name="q" value="{{ q }}" placeholder="Name, email, code or note" aria-label="Find a pass" style="flex:1;min-width:220px;height:46px;border:1px solid #C9CEC0;border-radius:10px;padding:0 12px;font-size:16px"><button class="btn ghost">Find</button></form>
+<section class="card scroll">
+<table>
+  <tr><th>Pass</th><th>Who</th><th>Left</th><th>Status</th></tr>
+  {% for p in passes %}
+  <tr>
+    <td><a href="{{ url_for('pass_page', code=p.code) }}"><b>{{ p.title }}</b></a><div class="code muted">{{ pretty_code(p.code) }}</div></td>
+    <td>{{ p.gift_for or p.holder }}{% if p.gift_for and p.holder %}<div class="muted">from {{ p.holder }}</div>{% endif %}{% if p.note %}<div class="muted">{{ p.note }}</div>{% endif %}</td>
+    <td>{% for c in p.credits %}<div style="font-size:14px">{{ c.left }} of {{ c.qty }} {{ c.name }}</div>{% endfor %}</td>
+    <td>{% if p.problem %}<span class="tag grey">{{ 'Off' if p.void else 'Expired' }}</span>{% else %}<span class="tag">{{ 'Sold' if p.source == 'sale' else 'Made by hand' }}</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="4" class="muted">{{ 'Nothing matches.' if q else 'No passes yet.' }}</td></tr>{% endfor %}
+</table>
+</section>
+{% endblock %}

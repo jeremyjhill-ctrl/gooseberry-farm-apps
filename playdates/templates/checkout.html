@@ -14,9 +14,40 @@
   <div style="display:block;font-weight:800">Arrival window: {{ window_label(b.window_start) }}</div>
   {% for label, amt in lines %}<div><span>{{ label }}</span><span>{{ money(amt) }}</span></div>{% endfor %}
   {% if b.under2 %}<div><span>{{ b.under2 }} under 2 (free)</span><span>Free</span></div>{% endif %}
+  {% if credit %}<div><span>{{ credit_label }}</span><span>−{{ money(credit) }}</span></div>{% endif %}
   {% if S.tax_mode == 'added' %}<div><span>Sales tax ({{ S.tax_rate }}%)</span><span>{{ money(tax) }}</span></div>{% endif %}
   <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
   {% if S.tax_mode == 'included' %}<div class="muted"><span>Includes {{ money(tax) }} sales tax</span><span></span></div>{% endif %}
+</section>
+
+{% set pp = pass_panel(b) %}
+<section class="card" id="pass">
+  {% if not pp %}
+  <h2>Have a pass or gift code?</h2>
+  <form method="post" action="{{ url_for('apply_pass', code=b.code) }}" class="row" style="gap:8px">
+    <input type="text" name="pass_code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH" aria-label="Pass or gift code" style="flex:1;min-width:150px;text-transform:uppercase">
+    <button class="btn ghost">Apply</button>
+  </form>
+  {% else %}
+  <div class="row between"><h2 style="margin:0">Pass {{ pp.code }}</h2>
+    <form method="post" action="{{ url_for('remove_pass', code=b.code) }}"><button class="linkbtn">Remove</button></form></div>
+  {% if pp.problem %}<div class="warn">{{ pp.problem }}</div>
+  {% elif not pp.choices %}<div class="warn">This pass has no credits left that work for this booking.</div>
+  {% else %}
+  <form method="post" action="{{ url_for('adjust_pass', code=b.code) }}" style="display:flex;flex-direction:column;gap:10px">
+    {% for c in pp.choices %}
+    <div class="row between" style="flex-wrap:nowrap">
+      <span style="font-weight:700">{{ c.name }} <span class="muted" style="font-weight:400">({{ c.left }} left)</span></span>
+      <select name="use_{{ c.credit_type_id }}" style="flex:0 0 auto" onchange="this.form.submit()" aria-label="How many {{ c.name }} to use">
+        {% for n in range(c.limit + 1) %}<option value="{{ n }}" {{ 'selected' if pp.detail.get(c.credit_type_id|string, 0) == n }}>Use {{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+    <noscript><button class="btn ghost">Update</button></noscript>
+    <div class="muted" style="font-size:14px">{% if pp.amount %}Your pass covers {{ money(pp.amount) }} of this booking.{% else %}Choose how many credits to use.{% endif %} You can use fewer and pay the difference to save credits for later.</div>
+  </form>
+  {% endif %}
+  {% endif %}
 </section>
 
 <div class="card" style="flex-direction:row;align-items:flex-start;gap:12px">
@@ -33,7 +64,7 @@
   <h2 style="margin-top:8px">Ticket policy</h2>
   {% for para in policy %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}
   <label class="inline"><input type="checkbox" name="agree" required> <span><strong>I agree to the ticket policy</strong></span></label>
-  <button class="btn big">Continue to payment</button>
+  <button class="btn big">{{ 'Continue to payment' if total > 0 else 'Continue' }}</button>
 </form>
 <script>
 (function(){var el=document.getElementById('clock');var s=+el.dataset.left;function t(){var m=Math.floor(s/60),x=s%60;el.textContent=m+':'+(x<10?'0':'')+x;if(s<=0){location.reload();return}s--;}t();setInterval(t,1000);})();

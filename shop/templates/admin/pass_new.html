@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+{% block title %}Make a code{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<a href="{{ url_for('admin_passes') }}" style="font-weight:700;text-decoration:none">‹ Passes &amp; codes</a>
+<h1>Make a code</h1>
+<p class="muted" style="margin:0">For donations, giveaways and "sorry we had to close" gifts. It works like a pass someone bought: they can book a playdate online with the code, or show the QR at the farm. You'll get a printable gift certificate.</p>
+<form method="post" class="card">
+  <label>Title on the pass <input type="text" name="title" value="{{ f.get('title', '') }}" placeholder="Gift playdate"></label>
+  <label>For (shows on the pass) <input type="text" name="gift_for" value="{{ f.get('gift_for', '') }}" placeholder="Rogersville Elementary auction winner"></label>
+  <h2 style="margin-top:6px">Credits</h2>
+  {% for i in range(4) %}
+  <div class="credrow">
+    <input type="number" name="cq_{{ i }}" min="0" value="{{ f.get('cq_%s'|format(i), '') }}" placeholder="0" aria-label="How many">
+    <select name="ct_{{ i }}" aria-label="Credit"><option value="">—</option>
+      {% for t in types %}<option value="{{ t.id }}" {{ 'selected' if f.get('ct_%s'|format(i)) == t.id|string }}>{{ t.name }}</option>{% endfor %}</select>
+  </div>
+  {% endfor %}
+  <label>Season wording <input type="text" name="season_label" value="{{ f.get('season_label', '') }}"></label>
+  <label>Credits work through <input type="date" name="valid_until" value="{{ f.get('valid_until', '') }}"></label>
+  <label>Their email (optional, only for your records) <input type="email" name="email" value="{{ f.get('email', '') }}"></label>
+  <label>Private note (only the farm sees it) <input type="text" name="note" value="{{ f.get('note', '') }}" placeholder="Donated to the Rogersville Elementary auction, Nov 2026"></label>
+  <button class="btn big">Make the code</button>
+</form>
+{% endblock %}

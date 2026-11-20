@@ -128,3 +128,6 @@ pre{white-space:pre-wrap;font-family:inherit;margin:0}
 
 .step a.off{background:#E2E4DA;border-color:#E2E4DA;color:#fff;cursor:not-allowed}
 .biggroup{background:#FFF4D6;border:1px solid #E9C46A;border-radius:12px;padding:12px 14px;font-size:15px}
+
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--green);text-decoration:underline;cursor:pointer}
+.sum div span:last-child{white-space:nowrap;padding-left:8px}

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publish Farm Apps.command: double-click to publish an update to the farm apps (playdates + Mollie's bakery).
+# Publish Farm Apps.command: double-click to publish an update to the farm apps (playdates, farm shop + Mollie's bakery).
 #
 # Claude puts a new delivery (farm-apps.bundle) into _pending/. This script:
 #   1. checks the delivery isn't damaged,
@@ -56,7 +56,8 @@ if [ ! -x "$HERE/.venv/bin/python" ]; then
   python3 -m venv "$HERE/.venv" && "$HERE/.venv/bin/pip" install -q --upgrade pip && "$HERE/.venv/bin/pip" install -q -r "$HERE/requirements-mac.txt"
 fi
 git -C "$WORK" checkout -q -f --detach refs/remotes/delivery/main
-echo "Running the playdate safety test and the bakery check on this delivery..."
+rm -f /tmp/farm-shop.json
+echo "Running the playdate safety test, the bakery check and the shop check on this delivery..."
 if ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/playdate_safety_test.py combined > /tmp/farm-safety.json 2>/tmp/farm-safety.log); then
   echo "STOPPED: the playdate safety test failed on this delivery, so nothing was published."
   grep -A20 '"failures"' /tmp/farm-safety.json || tail -20 /tmp/farm-safety.log
@@ -72,7 +73,12 @@ if [ -f "$WORK/tests/playdate_email_test.py" ] && ! (cd "$WORK" && env -u DATABA
   cat /tmp/farm-email.json; tail -20 /tmp/farm-email.log
   pause; exit 1
 fi
-echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery."
+if [ -f "$WORK/tests/shop_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/shop_test.py > /tmp/farm-shop.json 2>/tmp/farm-shop.log); then
+  echo "STOPPED: the farm shop check failed on this delivery, so nothing was published."
+  cat /tmp/farm-shop.json; tail -20 /tmp/farm-shop.log
+  pause; exit 1
+fi
+echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')."
 
 echo
 echo "Checking what's on GitHub now..."

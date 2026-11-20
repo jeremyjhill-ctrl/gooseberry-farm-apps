@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block title %}Order {{ pretty_code(o.code) }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<a href="{{ url_for('admin_orders') }}" style="font-weight:700;text-decoration:none">‹ Orders</a>
+<section class="card">
+  <div class="row between"><h1>{{ o.name }}</h1><span class="tag {{ '' if o.status == 'paid' else 'grey' }}">{{ o.status }}</span></div>
+  <div class="muted">Order <span class="code">{{ pretty_code(o.code) }}</span> · {{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }} · {{ o.email }}{% if o.phone %} · {{ o.phone }}{% endif %}</div>
+  <div class="sum">
+    {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }} <span class="muted">({{ {'ship': 'ship', 'pickup': 'pick up', 'pass': 'pass', 'none': ''}.get(l.fulfillment, '') }})</span></span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
+    {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}
+    <div><span>Sales tax</span><span>{{ money(o.tax) }}</span></div>
+    <div class="total"><span>Total</span><span>{{ money(o.total) }}</span></div>
+  </div>
+  {% if o.ship_line1 %}<div class="note"><b>Ship to</b><br>{{ o.ship_name }}<br>{{ o.ship_line1 }}{% if o.ship_line2 %}<br>{{ o.ship_line2 }}{% endif %}<br>{{ o.ship_city }}, {{ o.ship_state }} {{ o.ship_zip }}</div>{% endif %}
+  {% if o.status == 'paid' and o.lines|selectattr('fulfillment', 'in', ['ship', 'pickup'])|list %}
+  <form method="post" action="{{ url_for('admin_order_fulfilled', code=o.code) }}" class="row">
+    {% if o.fulfilled_at %}<span class="tag">Done {{ o.fulfilled_at[:10] }}</span><input type="hidden" name="undo" value="1"><button class="linkbtn">Not done yet</button>
+    {% else %}<label class="inline"><input type="checkbox" name="tell" value="1" checked> <span>Email them</span></label><button class="btn">Mark {{ 'shipped' if o.ship_line1 else 'picked up / ready' }}</button>{% endif %}
+  </form>
+  {% endif %}
+</section>
+{% if o.passes %}
+<section class="card">
+  <h2>Passes from this order</h2>
+  {% for p in o.passes %}<div class="row between"><a href="{{ url_for('pass_page', code=p.code) }}"><b>{{ p.title }}</b> <span class="code">{{ pretty_code(p.code) }}</span></a><span class="muted">{{ 'for ' ~ p.gift_for if p.gift_for }}</span></div>{% endfor %}
+</section>
+{% endif %}
+<details class="card"><summary style="font-weight:700;cursor:pointer">Terms they agreed to ({{ (o.agreed_at or '')[:16].replace('T', ' ') }})</summary>
+  {% for para in (o.agreed_terms or '').split('\n\n') %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}</details>
+{% endblock %}

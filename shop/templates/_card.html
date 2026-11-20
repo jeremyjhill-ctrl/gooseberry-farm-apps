@@ -1,0 +1,21 @@
+{% macro product_card(p) %}
+<a class="product" href="{{ url_for('product', pid=p.id) }}">
+  <div class="ph" {% if p.photo %}style="background-image:url('{{ url_for('photo', name=p.photo) }}')"{% endif %}>{% if not p.photo %}{{ p.name[:1] }}{% endif %}</div>
+  <div class="bd">
+    <h3>{{ p.name }}</h3>
+    {% if p.credits %}<ul class="includes">{% for c in p.credits %}<li>{{ c.qty }} × {{ c.name }}</li>{% endfor %}</ul>{% endif %}
+    <div class="row" style="gap:8px;margin-top:auto">
+      <span class="price">{{ money(p.price) }}</span>
+      {% if p.value_price and p.value_price > p.price %}<span class="was">{{ money(p.value_price) }} value</span>{% endif %}
+    </div>
+    <div class="row" style="gap:6px">
+      {% if p.hidden %}<span class="tag grey">Hidden</span>{% endif %}
+      {% if p.state == 'upcoming' %}<span class="tag amber">Coming soon</span>
+      {% elif p.state == 'ended' %}<span class="tag grey">Sale ended</span>
+      {% elif p.left == 0 %}<span class="tag red">Sold out</span>
+      {% elif p.left is not none and p.left <= 10 %}<span class="tag amber">Only {{ p.left }} left</span>{% endif %}
+      {% if p.kind == 'pass' and p.season_label %}<span class="tag">{{ p.season_label }}</span>{% endif %}
+    </div>
+  </div>
+</a>
+{% endmacro %}

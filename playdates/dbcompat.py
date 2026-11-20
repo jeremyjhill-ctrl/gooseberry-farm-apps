@@ -18,9 +18,12 @@ import sqlite3
 LOCK_KEY = 7317001  # one write at a time, like SQLite's BEGIN IMMEDIATE
 
 # Tables whose primary key decides what "INSERT OR REPLACE" replaces.
-REPLACE_KEYS = {"settings": "key", "day_overrides": "date", "stopped_days": "date", "day_plan": "date", "bakery_store": "id"}
+REPLACE_KEYS = {"settings": "key", "day_overrides": "date", "stopped_days": "date", "day_plan": "date", "bakery_store": "id",
+                "shop_settings": "key", "shop_pass_holds": "booking_id"}
 # Tables with an auto-numbered id (so cursor.lastrowid works).
-ID_TABLES = {"bookings", "payments", "outbox"}
+ID_TABLES = {"bookings", "payments", "outbox",
+             "shop_credit_types", "shop_pages", "shop_products", "shop_product_credits", "shop_orders",
+             "shop_order_lines", "shop_passes", "shop_pass_credits", "shop_pass_uses"}
 
 _pg_url = None
 

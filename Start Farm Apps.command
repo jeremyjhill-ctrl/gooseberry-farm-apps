@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click to run the farm apps on this Mac for testing: playdate booking + Mollie's bakery.
+# Double-click to run the farm apps on this Mac for testing: playdate booking, the farm shop + Mollie's bakery.
 # Test mode only: no real cards, emails or texts. Leave this window open while you use it.
 cd "$(dirname "$0")" || exit 1
 if [ ! -x ".venv/bin/python" ]; then
@@ -20,11 +20,12 @@ if [ ! -f data/playdates.db ] && [ -f "$OLD" ]; then
 fi
 LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
 HOST=${LAN_IP:-127.0.0.1}
-(sleep 2; open "http://$HOST:5050/book"; open "http://$HOST:5050/bakery/") &
+(sleep 2; open "http://$HOST:5050/book"; open "http://$HOST:5050/shop/admin"; open "http://$HOST:5050/bakery/") &
 echo ""
 if [ -n "$LAN_IP" ]; then
   echo "On your phone (same Wi-Fi as this Mac):"
   echo "  Playdates:  http://$LAN_IP:5050/book      (admin: /admin)"
+  echo "  Farm shop:  http://$LAN_IP:5050/shop/     (admin: /shop/admin, same password as playdates)"
   echo "  Bakery:     http://$LAN_IP:5050/bakery/   (admin: tap Baker login at the bottom)"
   echo "(If your Mac asks whether to allow incoming connections for Python, click Allow.)"
 fi

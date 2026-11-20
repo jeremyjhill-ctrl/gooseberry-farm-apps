@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Thank you{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<section class="card" style="align-items:center;text-align:center">
+  <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#E8F0DD"/><path d="M20 33l8 8 16-17" fill="none" stroke="#2F5D3A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <h1>Thank you, {{ o.name.split(' ')[0] }}!</h1>
+  <p style="margin:0">We emailed your receipt{% if o.passes %} and your pass{{ 'es' if o.passes|length > 1 }}{% endif %} to {{ o.email }}.</p>
+</section>
+{% if o.passes %}
+<section class="card">
+  <h2>Your pass{{ 'es' if o.passes|length > 1 }}</h2>
+  <p class="muted" style="margin:0">Each pass has its own QR code to show at the farm, and a code to book playdates online. Bookmark it or keep the email.</p>
+  {% for p in o.passes %}
+  <div class="row between" style="border-top:1px solid #EEEFE8;padding-top:10px">
+    <div><b>{{ p.title }}</b>{% if p.gift_for %}<div class="muted">A gift for {{ p.gift_for }}</div>{% endif %}<div class="code">{{ pretty_code(p.code) }}</div></div>
+    <div class="row"><a class="btn" href="{{ url_for('pass_page', code=p.code) }}">Open pass</a>
+      {% if p.gift_for %}<a class="btn ghost" href="{{ url_for('pass_print', code=p.code) }}">Printable gift card</a>{% endif %}</div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+<section class="card sum">
+  <h2>Receipt · order {{ pretty_code(o.code) }}</h2>
+  {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }}</span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
+  {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}
+  <div><span>Sales tax</span><span>{{ money(o.tax) }}</span></div>
+  <div class="total"><span>Paid</span><span>{{ money(o.total) }}</span></div>
+  {% if o.ship_line1 %}<div class="muted" style="display:block">Shipping to {{ o.ship_name }}, {{ o.ship_line1 }}{% if o.ship_line2 %}, {{ o.ship_line2 }}{% endif %}, {{ o.ship_city }}, {{ o.ship_state }} {{ o.ship_zip }}</div>{% endif %}
+  {% if o.lines|selectattr('fulfillment', 'equalto', 'pickup')|list %}<div class="muted" style="display:block">{{ SS.pickup_note }}</div>{% endif %}
+</section>
+{% endblock %}

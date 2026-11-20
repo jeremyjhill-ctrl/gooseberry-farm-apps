@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% block title %}Orders{% endblock %}
+{% block body %}
+<div class="row between"><h1>Orders</h1><a class="btn ghost" href="{{ url_for('admin_orders_csv') }}">Download spreadsheet</a></div>
+<div class="row">{% for k, label in [('paid', 'Paid'), ('pending', 'In checkout'), ('expired', 'Timed out'), ('all', 'All')] %}<a class="pill {{ 'on' if status == k }}" href="{{ url_for('admin_orders', status=k) }}">{{ label }}</a>{% endfor %}</div>
+<section class="card scroll">
+<table>
+  <tr><th>Order</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>To do</th></tr>
+  {% for o in orders %}
+  <tr>
+    <td><a href="{{ url_for('admin_order', code=o.code) }}" class="code">{{ pretty_code(o.code) }}</a><div class="muted">{{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }}</div></td>
+    <td><b>{{ o.name }}</b><div class="muted">{{ o.email }}</div></td>
+    <td>{% for l in o.lines %}{{ l.qty }} × {{ l.name }}<br>{% endfor %}</td>
+    <td class="num">{{ money(o.total) }}</td>
+    <td>{% if o.status != 'paid' %}<span class="tag grey">{{ o.status }}</span>{% elif o.needs and not o.fulfilled_at %}<span class="tag amber">{{ ' & '.join(o.needs)|replace('ship', 'Ship')|replace('pickup', 'Pick up') }}</span>{% elif o.needs %}<span class="tag">Done</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="muted">No orders here.</td></tr>{% endfor %}
+</table>
+</section>
+{% endblock %}

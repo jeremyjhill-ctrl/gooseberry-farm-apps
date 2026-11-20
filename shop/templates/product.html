@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+{% if p.page %}<a href="{{ url_for('page', slug=p.page.slug) }}" style="font-weight:700;text-decoration:none">‹ {{ p.page.title }}</a>{% else %}<a href="{{ url_for('home') }}" style="font-weight:700;text-decoration:none">‹ Shop</a>{% endif %}
+<section class="card" style="padding:0;overflow:hidden">
+  {% if p.photo %}<div class="product" style="border:0;border-radius:0"><div class="ph" style="background-image:url('{{ url_for('photo', name=p.photo) }}')"></div></div>{% endif %}
+  <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+    <h1>{{ p.name }}</h1>
+    <div class="row" style="gap:10px"><span class="price" style="font-size:24px">{{ money(p.price) }}</span>
+      {% if p.value_price and p.value_price > p.price %}<span class="was">{{ money(p.value_price) }} value · you save {{ money(p.value_price - p.price) }}</span>{% endif %}</div>
+    {% if p.credits %}
+    <div class="note" style="font-size:15px"><b>What's included</b>
+      <ul class="includes" style="margin-top:6px">{% for c in p.credits %}<li>{{ c.qty }} × {{ c.name }}{% if not c.available %} <span class="muted">({{ c.unavailable_note or 'not available right now' }})</span>{% endif %}</li>{% endfor %}</ul></div>
+    {% endif %}
+    {% for para in (p.description or '').split('\n\n') if para %}<p style="margin:0">{{ para }}</p>{% endfor %}
+    {% if p.kind == 'pass' %}<p class="muted" style="margin:0">{{ p.season_label }}{% if p.valid_until %} · credits work through {{ nice_day(p.valid_until) }}{% endif %}. You'll get a pass with a QR code by email: show it at the farm, and use its code to book playdates online.</p>
+    {% elif p.fulfillment == 'ship' %}<p class="muted" style="margin:0">Ships to you. Flat shipping {{ money(SS.shipping_flat) }} per order.</p>
+    {% elif p.fulfillment == 'pickup' %}<p class="muted" style="margin:0">Pick up at the farm.</p>{% endif %}
+    {% if p.buyable %}
+    <form method="post" action="{{ url_for('cart_add') }}" class="row">
+      <input type="hidden" name="product_id" value="{{ p.id }}">
+      <label style="flex-direction:row;align-items:center;gap:8px">How many
+        <select name="qty">{% for n in range(1, ([p.left or 10, p.per_order_limit or 10, 10]|min) + 1) %}<option>{{ n }}</option>{% endfor %}</select></label>
+      <button class="btn" style="flex:1">Add to cart</button>
+    </form>
+    {% if p.left is not none and p.left <= 10 %}<div class="muted">Only {{ p.left }} left.</div>{% endif %}
+    {% elif p.state == 'upcoming' %}<div class="warn">On sale {{ nice_when(p.page.starts_at) }}.</div>
+    {% elif p.state == 'ended' %}<div class="warn">This sale has ended.</div>
+    {% elif p.left == 0 %}<div class="warn">Sold out.</div>
+    {% else %}<div class="warn">Not available right now.</div>{% endif %}
+  </div>
+</section>
+{% endblock %}

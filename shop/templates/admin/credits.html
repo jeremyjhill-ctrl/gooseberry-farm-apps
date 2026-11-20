@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}Credits{% endblock %}
+{% block body %}
+<div class="row between"><h1>Credits</h1><a class="btn" href="{{ url_for('admin_credits', edit='new') }}">+ New kind of credit</a></div>
+<p class="muted" style="margin:0">Credits are what a pass holds. Make one for each thing you sell ahead: playdates, extra people or walk-in admission, flower picking, coffee... Then build pass bundles from them.</p>
+{% if edit %}
+<form method="post" class="card" style="border:2px solid var(--green)">
+  <h2>{{ 'Edit ' ~ current.name if current else 'New kind of credit' }}</h2>
+  <input type="hidden" name="id" value="{{ current.id if current else '' }}">
+  <label>Name customers see <input type="text" name="name" value="{{ current.name if current else '' }}" required placeholder="Flower picking (1 bucket)"></label>
+  <label>Worth (for reports) <input type="text" name="value" inputmode="decimal" value="{{ current.value|plain if current else '' }}" placeholder="15"></label>
+  <label>When booking a playdate online, it covers
+    <select name="booking_role">
+      <option value="" {{ 'selected' if not current or not current.booking_role }}>Nothing (not used for bookings)</option>
+      <option value="package" {{ 'selected' if current and current.booking_role == 'package' }}>The playdate package (up to 5 people)</option>
+      <option value="person" {{ 'selected' if current and current.booking_role == 'person' }}>One extra person</option></select></label>
+  <label class="inline"><input type="checkbox" name="at_farm" {{ 'checked' if current and current.at_farm }}> <span>Can be ticked off at the farm (walk-in admission, flowers, coffee...)</span></label>
+  <label class="inline"><input type="checkbox" name="available" {{ 'checked' if not current or current.available }}> <span>In season (uncheck when it's over, e.g. flower picking in a drought)</span></label>
+  <label>What customers see when it's out of season <input type="text" name="unavailable_note" value="{{ current.unavailable_note if current else '' }}" placeholder="Flower season is over for this year"></label>
+  <div class="row"><button class="btn">Save</button><a href="{{ url_for('admin_credits') }}">Cancel</a></div>
+  {% if current and current.on_passes %}<div class="note">{{ current.on_passes }} pass{{ 'es have' if current.on_passes != 1 else ' has' }} this credit. Renaming it doesn't change passes already sold; the in-season switch applies to all of them.</div>{% endif %}
+</form>
+{% endif %}
+<section class="card scroll">
+<table>
+  <tr><th>Credit</th><th>Used for</th><th>Season</th><th class="num">Still owed</th><th></th></tr>
+  {% for t in types %}
+  <tr>
+    <td><a href="{{ url_for('admin_credits', edit=t.id) }}"><b>{{ t.name }}</b></a><div class="muted">worth {{ money(t.value) }}</div></td>
+    <td>{% if t.booking_role == 'package' %}Booking: the playdate package{% elif t.booking_role == 'person' %}Booking: one extra person{% endif %}{% if t.booking_role and t.at_farm %} · {% endif %}{% if t.at_farm %}At the farm{% endif %}{% if not t.booking_role and not t.at_farm %}<span class="muted">Nowhere yet: edit it</span>{% endif %}</td>
+    <td>{% if t.available %}<span class="tag">In season</span>{% else %}<span class="tag grey">Out of season</span>{% endif %}</td>
+    <td class="num">{{ outstanding[t.id].left if t.id in outstanding else 0 }}</td>
+    <td class="row" style="gap:6px;justify-content:flex-end">
+      <form method="post" action="{{ url_for('admin_credit_season', cid=t.id) }}"><button class="btn ghost" style="min-height:36px">{{ 'Mark out of season' if t.available else 'Back in season' }}</button></form>
+      {% if not t.on_passes %}<form method="post" action="{{ url_for('admin_credit_remove', cid=t.id) }}"><button class="linkbtn">Remove</button></form>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</section>
+{% endblock %}

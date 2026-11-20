@@ -1,6 +1,17 @@
 {% extends "admin_base.html" %}
 {% block title %}Pricing & schedule{% endblock %}
 {% block body %}
+<section class="card" id="visibility">
+  <h2>Booking page</h2>
+  <form method="post" action="{{ url_for('admin_booking_visibility') }}" style="display:flex;flex-direction:column;gap:10px">
+    <input type="hidden" name="next" value="{{ url_for('admin_settings') }}#visibility">
+    <label class="inline"><input type="radio" name="hidden" value="0" {{ 'checked' if not S.booking_hidden }}> <span><b>Visible</b> to guests</span></label>
+    <label class="inline"><input type="radio" name="hidden" value="1" {{ 'checked' if S.booking_hidden }}> <span><b>Hidden</b>: guests see the message below instead (you can still see it while logged in). Tickets people already have keep working.</span></label>
+    <label>Message guests see while it's hidden
+      <textarea name="message" rows="2" style="border:1px solid #C9CEC0;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit">{{ S.booking_hidden_message or booking_hidden_default }}</textarea></label>
+    <button class="btn">Save</button>
+  </form>
+</section>
 <section class="card">
   <h2>Start from a pricing preset</h2>
   <form method="post" class="grid">

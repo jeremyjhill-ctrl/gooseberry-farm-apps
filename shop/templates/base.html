@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ SS.shop_name }}{% endblock %} · Gooseberry Bridge Farm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='shop.css') }}">
+</head>
+<body>
+{% if is_admin() %}<div class="adminbar noprint"><div class="in"><span>{% if SS.shop_hidden %}<b>The shop is hidden from customers.</b> You're seeing it because you're logged in.{% else %}You're logged in as the farm.{% endif %}</span>
+  <span><a href="{{ url_for('admin_home') }}">Shop admin</a> · <a href="{{ url_for('admin_scan') }}">Scan a pass</a></span></div></div>{% endif %}
+<header class="top"><div class="in">
+  <a class="brand" href="{% block brandlink %}{{ url_for('home') }}{% endblock %}" style="color:#fff;text-decoration:none"><small>Gooseberry Bridge Farm</small><b>{% block heading %}{{ SS.shop_name }}{% endblock %}</b></a>
+  {% block nav %}<nav aria-label="Shop"><a href="{{ url_for('home') }}">Shop</a><a href="{{ url_for('cart_view') }}">Cart{% if cart_count %} ({{ cart_count }}){% endif %}</a></nav>{% endblock %}
+</div></header>
+<main class="wrap {% block wrapclass %}{% endblock %}">
+  {% with msgs = get_flashed_messages() %}{% for m in msgs %}<div class="flash" role="status">{{ m }}</div>{% endfor %}{% endwith %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

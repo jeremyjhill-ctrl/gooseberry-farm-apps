@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+{% block title %}Shop admin{% endblock %}
+{% block body %}
+<div class="grid">
+  <form method="post" action="{{ url_for('admin_visibility') }}" class="card">
+    <input type="hidden" name="which" value="shop">
+    <div class="row between"><h2>Farm shop</h2><span class="tag {{ 'grey' if SS.shop_hidden else '' }}">{{ 'Hidden' if SS.shop_hidden else 'Open' }}</span></div>
+    <div class="switch"><label><input type="radio" name="hidden" value="0" {{ 'checked' if not SS.shop_hidden }}> Open</label>
+      <label><input type="radio" name="hidden" value="1" {{ 'checked' if SS.shop_hidden }}> Hidden</label></div>
+    <label>Message while hidden <textarea name="message" rows="2">{{ SS.shop_hidden_message }}</textarea></label>
+    <button class="btn ghost">Save</button>
+    <div class="muted">Hide single products or sale pages from their own lists.</div>
+  </form>
+  <form method="post" action="{{ url_for('admin_visibility') }}" class="card">
+    <input type="hidden" name="which" value="booking">
+    <div class="row between"><h2>Playdate booking page</h2><span class="tag {{ 'grey' if pd.booking_hidden else '' }}">{{ 'Hidden' if pd.booking_hidden else 'Visible' }}</span></div>
+    <div class="switch"><label><input type="radio" name="hidden" value="0" {{ 'checked' if not pd.booking_hidden }}> Visible</label>
+      <label><input type="radio" name="hidden" value="1" {{ 'checked' if pd.booking_hidden }}> Hidden</label></div>
+    <label>Message while hidden <textarea name="message" rows="2">{{ pd.booking_hidden_message or booking_hidden_default }}</textarea></label>
+    <button class="btn ghost">Save</button>
+    <div class="muted">Tickets people already have keep working. You can still see the page while logged in to the playdate admin.</div>
+  </form>
+</div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+  <a class="stat" href="{{ url_for('admin_orders') }}" style="text-decoration:none;color:inherit"><span class="muted">Paid orders</span><b>{{ orders_count }}</b><span class="muted">{{ money(revenue) }} before tax</span></a>
+  <a class="stat" href="{{ url_for('admin_orders') }}" style="text-decoration:none;color:inherit"><span class="muted">To ship or hand over</span><b>{{ to_ship }}</b></a>
+  <a class="stat" href="{{ url_for('admin_passes') }}" style="text-decoration:none;color:inherit"><span class="muted">Passes sold</span><b>{{ passes_sold }}</b><span class="muted">+ {{ passes_made }} made by hand</span></a>
+</div>
+<section class="card">
+  <div class="row between"><h2>Credits still owed</h2><a href="{{ url_for('admin_credits') }}">Credit types</a></div>
+  <p class="muted" style="margin:0">On passes that still work: what's been sold or given and not used yet.</p>
+  <div class="scroll"><table><tr><th>Credit</th><th class="num">Issued</th><th class="num">Used</th><th class="num">Still owed</th><th class="num">Worth</th></tr>
+  {% for o in outstanding %}<tr><td>{{ o.name }}</td><td class="num">{{ o.issued }}</td><td class="num">{{ o.used }}</td><td class="num"><b>{{ o.left }}</b></td><td class="num">{{ money(o.left * o.value) }}</td></tr>{% endfor %}
+  </table></div>
+</section>
+<section class="card">
+  <div class="row between"><h2>Latest orders</h2><a href="{{ url_for('admin_orders') }}">All orders</a></div>
+  {% for o in recent %}<div class="row between" style="border-top:1px solid #EEEFE8;padding-top:8px"><a href="{{ url_for('admin_order', code=o.code) }}"><b>{{ o.name }}</b></a><span class="muted">{{ (o.paid_at or '')[:16].replace('T', ' ') }} · {{ money(o.total) }}</span></div>
+  {% else %}<p class="muted" style="margin:0">No orders yet.</p>{% endfor %}
+</section>
+<div class="row"><a class="btn" href="{{ url_for('admin_product', kind='pass') }}">+ New pass bundle</a><a class="btn ghost" href="{{ url_for('admin_product', kind='item') }}">+ New product</a>
+  <a class="btn ghost" href="{{ url_for('admin_pass_new') }}">+ Make a code</a><a class="btn ghost" href="{{ url_for('admin_logout') }}">Log out</a></div>
+{% endblock %}

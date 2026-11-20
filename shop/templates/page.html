@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_card.html" import product_card %}
+{% block title %}{{ p.title }}{% endblock %}
+{% block body %}
+<section class="pagehead">
+  <h1>{{ p.title }}</h1>
+  {% for para in (p.intro or '').split('\n\n') if para %}<p style="margin:0">{{ para }}</p>{% endfor %}
+  {% if p.state == 'hidden' %}<div class="warn">This page is hidden. Only you can see it.</div>
+  {% elif p.state == 'upcoming' %}<div class="warn" style="font-weight:800">This sale opens {{ nice_when(p.starts_at) }}.{% if p.starts_at %} <span id="countdown" data-at="{{ p.starts_at }}"></span>{% endif %}</div>
+  {% elif p.state == 'ended' %}<div class="warn" style="font-weight:800">This sale has ended. Thank you!</div>
+  {% elif p.ends_at %}<div class="note" style="font-weight:700">Ends {{ nice_when(p.ends_at) }}</div>{% endif %}
+</section>
+<div class="products">{% for x in products %}{{ product_card(x) }}{% else %}<p>Nothing here yet.</p>{% endfor %}</div>
+<script>
+(function(){var el=document.getElementById('countdown');if(!el)return;var at=new Date(el.dataset.at).getTime();
+function t(){var s=Math.max(0,Math.floor((at-Date.now())/1000));if(s===0){location.reload();return}
+var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);el.textContent='('+(d?d+'d ':'')+h+'h '+m+'m to go)';}t();setInterval(t,30000);})();
+</script>
+{% endblock %}

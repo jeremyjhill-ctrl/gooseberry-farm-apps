@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% block title %}Shop settings{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<h1>Shop settings</h1>
+<form method="post" class="card">
+  <label>Shop name <input type="text" name="shop_name" value="{{ SS.shop_name }}"></label>
+  <label>Welcome text on the shop page <textarea name="intro" rows="3">{{ SS.intro }}</textarea></label>
+  <label>Terms every buyer agrees to <textarea name="terms" rows="5">{{ SS.terms }}</textarea></label>
+  <div class="muted">Each pass bundle also adds its season wording and its own extra terms. The exact wording a buyer agreed to is saved with their order.</div>
+  <label>Pick-up instructions (in the receipt email) <textarea name="pickup_note" rows="2">{{ SS.pickup_note }}</textarea></label>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <label>Flat shipping per order <input type="text" name="shipping_flat" inputmode="decimal" value="{{ SS.shipping_flat|plain }}"></label>
+    <label>Sales tax % <input type="text" name="tax_rate" inputmode="decimal" value="{{ own_tax.value|replace('null', '') if own_tax else '' }}" placeholder="{{ pd_tax }} (same as playdates)"></label>
+  </div>
+  <div class="muted">Tax applies to taxable items picked up or shipped in Missouri, and to passes. Items shipped out of state aren't taxed. Shipping isn't taxed. Check these rules with your accountant.</div>
+  <label>Message while the shop is hidden <textarea name="shop_hidden_message" rows="2">{{ SS.shop_hidden_message }}</textarea></label>
+  <button class="btn big">Save</button>
+</form>
+{% endblock %}

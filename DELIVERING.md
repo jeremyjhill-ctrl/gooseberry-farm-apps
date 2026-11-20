@@ -1,13 +1,18 @@
 # Delivering an update (notes for Claude)
 
-The farm apps live in `Claude Projects/Farm Apps` on Jeremy's Mac and in the private GitHub repo
+The code is owned by the "Booking App - Original Chat 1" chat (since Nov 20, 2026). The farm apps live in `Claude Projects/Farm Apps` on Jeremy's Mac and in the private GitHub repo
 `gooseberry-farm-apps`, which Render deploys from. Jeremy publishes; Claude never pushes.
 
 1. Start from the current code: the Mac folder's `.publish-work/` is a git repo with the published history
    (stage `.publish-work/.git` or rebuild from `_published/*.bundle`), so updates fast-forward cleanly.
 2. Make the change. Keep `playdates/app.py` and `playdates/logic.py` changes minimal; the booking app is the part to protect.
-3. Run the checks: `python tests/playdate_safety_test.py original|combined` (also with DATABASE_URL on a Postgres)
-   and `python tests/bakery_test.py` (also `--r2`). Results must match the original booking app.
+   Pass codes hook into the booking app through `playdates/farm_passes.py` (registered at the end of app.py) plus a few
+   lines in checkout(), pay() and admin_cancel(). The farm shop lives in `shop/`.
+3. Run the checks: `python tests/playdate_safety_test.py original|combined` (also with DATABASE_URL on a Postgres),
+   `python tests/bakery_test.py` (also `--r2`), `python tests/playdate_email_test.py` and `python tests/shop_test.py`
+   (also on Postgres). Results must match the original booking app.
+   Watch for: no semicolons inside SQL comments (the Postgres setup splits on them), and booleans in SQL written as
+   `x = 1` rather than bare `?` (Postgres is stricter than SQLite).
 4. Commit, then `git bundle create farm-apps.bundle main` and put it at `Farm Apps/_pending/farm-apps.bundle`.
 5. Tell Jeremy to double-click **Publish Farm Apps** (it re-runs the checks on the delivery, shows the changes,
    pushes to GitHub on [l]ive, and updates the folder's code).

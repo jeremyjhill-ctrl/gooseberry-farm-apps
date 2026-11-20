@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}Sale pages{% endblock %}
+{% block body %}
+<div class="row between"><h1>Sale pages</h1><a class="btn" href="{{ url_for('admin_pages', edit='new') }}">+ New sale page</a></div>
+<p class="muted" style="margin:0">A sale page groups products for an event, like <i>Black Friday 2026</i>, with its own link and its own start and end times. Before it starts, customers see "opens in..."; after it ends, nothing on it can be bought.</p>
+{% if edit %}
+<form method="post" class="card" style="border:2px solid var(--green)">
+  <h2>{{ 'Edit ' ~ current.title if current else 'New sale page' }}</h2>
+  <input type="hidden" name="id" value="{{ current.id if current else '' }}">
+  <label>Title <input type="text" name="title" value="{{ current.title if current else '' }}" required placeholder="Black Friday 2026"></label>
+  <label>Web address ending (optional) <input type="text" name="slug" value="{{ current.slug if current else '' }}" placeholder="black-friday"></label>
+  <label>Intro <textarea name="intro" rows="3" placeholder="Our biggest sale of the year: pre-buy next spring's playdates and save.">{{ current.intro if current else '' }}</textarea></label>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <label>Opens (blank = now) <input type="datetime-local" name="starts_at" value="{{ (current.starts_at or '')[:16] if current else '' }}"></label>
+    <label>Closes (blank = no end) <input type="datetime-local" name="ends_at" value="{{ (current.ends_at or '')[:16] if current else '' }}"></label>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <label class="inline"><input type="checkbox" name="hidden" {{ 'checked' if (current and current.hidden) or not current }}> <span><b>Hidden</b> while you set it up</span></label>
+    <label>Order on the shop page <input type="number" name="sort" value="{{ current.sort if current else 0 }}"></label>
+  </div>
+  <div class="row"><button class="btn">Save</button><a href="{{ url_for('admin_pages') }}">Cancel</a></div>
+</form>
+{% endif %}
+<section class="card scroll">
+<table>
+  <tr><th>Page</th><th>When</th><th>Status</th><th class="num">Products</th><th></th></tr>
+  {% for p in pages %}
+  <tr>
+    <td><a href="{{ url_for('admin_pages', edit=p.id) }}"><b>{{ p.title }}</b></a><div class="muted"><a href="{{ url_for('page', slug=p.slug) }}">{{ url_for('page', slug=p.slug, _external=True) }}</a></div></td>
+    <td>{% if p.starts_at %}{{ nice_when(p.starts_at) }}{% else %}Now{% endif %} – {% if p.ends_at %}{{ nice_when(p.ends_at) }}{% else %}no end{% endif %}</td>
+    <td>{% if p.state == 'hidden' %}<span class="tag grey">Hidden</span>{% elif p.state == 'upcoming' %}<span class="tag amber">Opens later</span>{% elif p.state == 'ended' %}<span class="tag grey">Ended</span>{% else %}<span class="tag">Open</span>{% endif %}</td>
+    <td class="num">{{ p.count }}</td>
+    <td class="row" style="gap:6px;justify-content:flex-end">
+      <form method="post" action="{{ url_for('admin_page_toggle', pid=p.id) }}"><button class="btn ghost" style="min-height:36px">{{ 'Show' if p.hidden else 'Hide' }}</button></form>
+      <form method="post" action="{{ url_for('admin_page_remove', pid=p.id) }}" onsubmit="return confirm('Remove this page? Its products stay in your product list.')"><button class="linkbtn">Remove</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="muted">No sale pages yet. Products without a page show on the main shop page.</td></tr>{% endfor %}
+</table>
+</section>
+{% endblock %}

@@ -4,8 +4,11 @@
   doesn't change it; it only decides which app answers each visitor.
 - Mollie's bakery answers at its own web address (any host starting with "bakery.", or the
   hosts listed in BAKERY_HOSTS), and at /bakery/ on this server for local testing.
+- The farm shop (passes, bundles, products) answers at any host starting with "shop." (or the
+  hosts in SHOP_HOSTS), and at /shop/ for local testing. It shares the playdate database so
+  passes can pay for bookings; it shares nothing with the bakery.
 
-Run locally:   python wsgi.py           -> http://127.0.0.1:5050/book and /bakery/
+Run locally:   python wsgi.py           -> http://127.0.0.1:5050/book, /shop/ and /bakery/
 On Render:     gunicorn wsgi:application
 """
 import os
@@ -28,11 +31,14 @@ if os.environ.get("DATABASE_URL") and not os.environ.get("FARM_TEST_MODE"):
 sys.path.insert(0, os.path.join(ROOT, "playdates"))
 import app as playdates  # noqa: E402  (the playdate app, unchanged)
 from bakery import create_app  # noqa: E402
+import shop as farm_shop  # noqa: E402
 from werkzeug.middleware.dispatcher import DispatcherMiddleware  # noqa: E402
 
 bakery = create_app()
+shop = farm_shop.create_app()
 BAKERY_HOSTS = {h.strip().lower() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()}
-by_path = DispatcherMiddleware(playdates.app.wsgi_app, {"/bakery": bakery.wsgi_app})
+SHOP_HOSTS = {h.strip().lower() for h in os.environ.get("SHOP_HOSTS", "").split(",") if h.strip()}
+by_path = DispatcherMiddleware(playdates.app.wsgi_app, {"/bakery": bakery.wsgi_app, "/shop": shop.wsgi_app})
 
 
 def application(environ, start_response):
@@ -40,8 +46,10 @@ def application(environ, start_response):
     host = host.split(",")[0].split(":")[0].strip().lower()
     if host in BAKERY_HOSTS or host.startswith("bakery."):
         return bakery.wsgi_app(environ, start_response)
-    if environ.get("PATH_INFO") == "/bakery":
-        start_response("301 Moved Permanently", [("Location", environ.get("SCRIPT_NAME", "") + "/bakery/")])
+    if host in SHOP_HOSTS or host.startswith("shop."):
+        return shop.wsgi_app(environ, start_response)
+    if environ.get("PATH_INFO") in ("/bakery", "/shop"):
+        start_response("301 Moved Permanently", [("Location", environ.get("SCRIPT_NAME", "") + environ["PATH_INFO"] + "/")])
         return [b""]
     return by_path(environ, start_response)
 
@@ -52,6 +60,7 @@ if __name__ == "__main__":
     print("\n  Farm apps are running.")
     print("  Playdate booking:   http://127.0.0.1:{}/book".format(port))
     print("  Playdate admin:     http://127.0.0.1:{}/admin   (password: {})".format(port, playdates.ADMIN_PASSWORD))
+    print("  Farm shop:          http://127.0.0.1:{}/shop/   (admin: /shop/admin, same password)".format(port))
     print("  Mollie's bakery:    http://127.0.0.1:{}/bakery/".format(port))
     print("  Bakery admin:       http://127.0.0.1:{}/bakery/#admin\n".format(port))
     run_simple("0.0.0.0", port, application, use_reloader=True)

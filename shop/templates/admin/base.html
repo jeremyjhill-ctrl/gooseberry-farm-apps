@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block heading %}Farm shop admin{% endblock %}
+{% block brandlink %}{{ url_for('admin_home') }}{% endblock %}
+{% block nav %}
+<nav aria-label="Shop admin">
+  {% set p = request.path %}
+  <a href="{{ url_for('admin_home') }}" class="{{ 'on' if p.endswith('/admin') }}">Home</a>
+  <a href="{{ url_for('admin_products') }}" class="{{ 'on' if '/admin/products' in p }}">Products</a>
+  <a href="{{ url_for('admin_pages') }}" class="{{ 'on' if '/admin/pages' in p }}">Sale pages</a>
+  <a href="{{ url_for('admin_credits') }}" class="{{ 'on' if '/admin/credits' in p }}">Credits</a>
+  <a href="{{ url_for('admin_orders') }}" class="{{ 'on' if '/admin/orders' in p }}">Orders</a>
+  <a href="{{ url_for('admin_passes') }}" class="{{ 'on' if '/admin/passes' in p }}">Passes &amp; codes</a>
+  <a href="{{ url_for('admin_scan') }}" class="{{ 'on' if '/admin/scan' in p }}">Scan</a>
+  <a href="{{ url_for('admin_settings') }}" class="{{ 'on' if '/admin/settings' in p }}">Settings</a>
+  <a href="{{ url_for('home') }}">Shop ↗</a>
+  <a href="{{ booking_url('/admin') }}">Playdates ↗</a>
+</nav>
+{% endblock %}

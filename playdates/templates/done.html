@@ -11,6 +11,7 @@
   <div>Arrival window: <strong>{{ window_label(b.window_start) }}</strong></div>
   <div class="muted">{{ S.policy_short }}</div>
   <div>{{ desc }} · Paid {{ money(paid.total) }}</div>
+  {% for u in pass_uses_for(b) %}<div class="muted">Used {{ u.qty }} × {{ u.name }} from pass {{ u.code }}</div>{% endfor %}
   <div class="muted">Confirmation code {{ b.code }} · 177 Elm Grove Rd, Rogersville, MO 65742</div>
 </section>
 <div class="note">We emailed and texted you a link to your ticket: <b>one ticket for your whole group</b>. Show that page at the gate.{% if b.sms_ok %} We'll text you a reminder the day before.{% endif %}</div>

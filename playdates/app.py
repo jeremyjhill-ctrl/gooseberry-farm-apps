@@ -14,6 +14,7 @@ import random
 import re
 import secrets
 import sqlite3
+import sys
 from functools import wraps
 from zoneinfo import ZoneInfo
 
@@ -377,9 +378,12 @@ def checkout(code):
             return redirect(url_for("pay", code=code))
         b.update(name=name, email=email, phone=phone, sms_ok=sms_ok)
     lines, sub = logic.price_lines(b["tickets"], s)
+    credit, credit_label, _ = farm_passes.booking_discount(db(), b, s, logic.subtotal_for)  # pass or gift code, if any
+    sub = round(sub - credit, 2)
     tax, total = logic.tax_for(sub, s)
     expires = dt.datetime.fromisoformat(b["hold_expires"])
     return render_template("checkout.html", b=b, lines=lines, sub=sub, tax=tax, total=total, errors=errors,
+                           credit=credit, credit_label=credit_label,
                            policy=logic.policy_paragraphs(s),
                            seconds_left=max(0, int((expires - now()).total_seconds())))
 
@@ -405,6 +409,10 @@ def pay(code):
     else:
         sub = logic.subtotal_for(b["tickets"], s)
         label = "Farm Baby Playdate · {} · {}".format(nice_date(b["date"]), describe(b, s))
+    credit, credit_label = 0.0, ""
+    if not add:
+        credit, credit_label, _ = farm_passes.booking_discount(db(), b, s, logic.subtotal_for)
+        sub = round(sub - credit, 2)
     tax, total = logic.tax_for(sub, s)
 
     error = None
@@ -422,12 +430,17 @@ def pay(code):
             return render_template("message.html", title="This time is no longer available",
                                    body="Sorry, the farm stopped taking bookings for that time, or your hold ran out. You weren't charged.",
                                    link=url_for("book"), link_text="Pick another time")
-        if card == TEST_CARD_DECLINE:
+        problem = ""
+        if total > 0 and card == TEST_CARD_DECLINE:
             conn.execute("ROLLBACK")
             error = "Your card was declined. (Test decline card.) Try 4242 4242 4242 4242."
-        elif card != TEST_CARD_OK:
+        elif total > 0 and card != TEST_CARD_OK:
             conn.execute("ROLLBACK")
             error = "Test mode: use card 4242 4242 4242 4242 (any future date, any 3 digits)."
+        elif not add and credit and farm_passes.consume(conn, fresh, s, logic.subtotal_for)[1]:
+            conn.execute("ROLLBACK")  # the pass ran out of credits since checkout: charge nothing, ask again
+            farm_passes.release(db(), b["id"])
+            error = "Your pass doesn't have enough credits left for this booking anymore, so it was removed. Please go back and check the price."
         else:
             stamp = now().isoformat()
             if add:
@@ -437,7 +450,7 @@ def pay(code):
                 conn.execute("UPDATE bookings SET status='paid', paid_at=?, hold_expires=NULL WHERE id=?", (stamp, b["id"]))
                 kind, count = "online", b["tickets"]
             conn.execute("INSERT INTO payments(booking_id, kind, tickets, subtotal, tax, total, method, created_at) "
-                         "VALUES (?,?,?,?,?,?, 'test_card', ?)", (b["id"], kind, count, sub, tax, total, stamp))
+                         "VALUES (?,?,?,?,?,?,?,?)", (b["id"], kind, count, sub, tax, total, "test_card" if total > 0 else "pass", stamp))
             conn.execute("COMMIT")
             b = booking_by_code(code)
             when = "{}, arrival window {}".format(nice_date(b["date"], long=True), window_label(b["window_start"], s))
@@ -455,7 +468,8 @@ def pay(code):
                                                           describe(b, s), money(total), money(tax), ticket_link(code)))
                 send(b, "text", None, "Gooseberry Bridge Farm: You're booked! Your group ticket & arrival details: {} Reply STOP to opt out".format(ticket_link(code)))
             return redirect(url_for("done", code=code))
-    return render_template("pay.html", b=b, label=label, sub=sub, tax=tax, total=total, error=error, add=add)
+    return render_template("pay.html", b=b, label=label, sub=sub, tax=tax, total=total, error=error, add=add,
+                           credit=credit, credit_label=credit_label)
 
 
 @app.route("/done/<code>")
@@ -1070,7 +1084,9 @@ def admin_bookings():
 @admin_required
 def admin_cancel(bid):
     db().execute("UPDATE bookings SET status='cancelled' WHERE id=?", (bid,))
-    flash("Booking cancelled. (In the real app you'd choose whether to refund in Stripe.)")
+    back = farm_passes.give_back(db(), bid, "farm", "booking cancelled")
+    flash("Booking cancelled. (In the real app you'd choose whether to refund in Stripe.)"
+          + (" {} pass credit{} went back on the pass.".format(back, "" if back == 1 else "s") if back else ""))
     return redirect(url_for("admin_bookings"))
 
 
@@ -1281,6 +1297,9 @@ def admin_demo_clear():
 
 
 init_db()
+
+import farm_passes  # noqa: E402  pass and gift codes at checkout, and the hide-the-booking-page switch (see farm_passes.py)
+farm_passes.register(sys.modules[__name__])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))

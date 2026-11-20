@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_card.html" import product_card %}
+{% block body %}
+<section class="pagehead"><h1>{{ SS.shop_name }}</h1>{% for para in SS.intro.split('\n\n') %}<p style="margin:0">{{ para }}</p>{% endfor %}</section>
+{% for pg in pages %}
+<section class="card">
+  <div class="row between"><h2>{{ pg.title }}</h2>
+    {% if pg.state == 'upcoming' %}<span class="tag amber">Opens {{ nice_when(pg.starts_at) }}</span>{% elif pg.ends_at %}<span class="tag">Ends {{ nice_when(pg.ends_at) }}</span>{% endif %}</div>
+  {% if pg.intro %}<p style="margin:0">{{ pg.intro.split('\n\n')[0] }}</p>{% endif %}
+  <div class="products">{% for p in pg.products[:6] %}{{ product_card(p) }}{% endfor %}</div>
+  <a class="btn ghost" href="{{ url_for('page', slug=pg.slug) }}">See {{ pg.title }}</a>
+</section>
+{% endfor %}
+{% if products %}
+<section style="display:flex;flex-direction:column;gap:12px">
+  {% if pages %}<h2>Everything else</h2>{% endif %}
+  <div class="products">{% for p in products %}{{ product_card(p) }}{% endfor %}</div>
+</section>
+{% endif %}
+{% if not pages and not products %}<section class="card"><p style="margin:0">Nothing's for sale right now. Check back soon!</p></section>{% endif %}
+{% endblock %}

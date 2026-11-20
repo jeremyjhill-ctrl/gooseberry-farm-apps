@@ -1,0 +1,11 @@
+{% extends "admin/base.html" %}
+{% block title %}Scan{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<section class="card">
+  <h1>Scan a pass or ticket</h1>
+  <p style="margin:0">Point your phone's camera at the customer's QR code: it opens their pass (or playdate ticket) right here. Or type the code:</p>
+  <form method="get" class="row"><input type="text" name="code" autocapitalize="characters" autocomplete="off" placeholder="ABCD-EFGH" style="flex:1;text-transform:uppercase" aria-label="Code" autofocus><button class="btn">Open</button></form>
+  <p class="muted" style="margin:0">Find by name instead: <a href="{{ url_for('admin_passes') }}">Passes</a> · <a href="{{ booking_url('/admin/find') }}">Playdate check-in</a></p>
+</section>
+{% endblock %}
