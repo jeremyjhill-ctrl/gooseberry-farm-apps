@@ -74,6 +74,10 @@ class ConsoleMail:
         _log('\n'.join(lines))
         return True
 
+    def send_result(self, to, subject, text, html=None):
+        self.send(to, subject, text, html)
+        return 'console', 'No email service is connected here, so nothing was sent.'
+
 
 class ResendMail:
     """Resend's HTTP API.
@@ -106,7 +110,14 @@ class ResendMail:
         self.sender = sender
 
     def send(self, to, subject, text, html=None):
-        """True if it was accepted. False, with a reason in the log, if not.
+        return self.send_result(to, subject, text, html)[0] == 'sent'
+
+    def send_result(self, to, subject, text, html=None):
+        """('sent', id) if it was accepted. Otherwise, with a reason in the log:
+          ('limit', why)  Resend's daily or monthly quota is used up: try again after it resets
+          ('retry', why)  a passing problem (Resend busy or down, the connection dropped): try again soon
+          ('failed', why) something trying again won't fix (a bad address, a revoked key)
+
 
         Never raises. A password reset that cannot be sent should show the
         person a page saying so - not a 500 that tells them nothing and tells
@@ -136,17 +147,17 @@ class ResendMail:
             with urllib.request.urlopen(request, timeout=20) as response:
                 body = json.loads(response.read().decode('utf-8') or '{}')
             _log(f'MAIL SENT to {to}: {body.get("id", "(no id)")}')
-            return True
+            return 'sent', body.get('id', '')
         except urllib.error.HTTPError as exc:
             # The body carries the actual reason - an unverified domain, a
             # revoked key - and it is worth having in the log rather than a
             # bare status code. The key itself is never in here.
             detail = exc.read().decode('utf-8', 'replace')[:300]
             _log(f'MAIL REFUSED for {to} ({exc.code}): {detail}')
-            return False
+            return classify_refusal(exc.code, detail)
         except Exception as exc:                        # noqa: BLE001
             _log(f'MAIL FAILED for {to}: {type(exc).__name__}: {exc}')
-            return False
+            return 'retry', f'Could not reach the email service ({type(exc).__name__}).'
 
 
 class MemoryMail:
@@ -158,9 +169,26 @@ class MemoryMail:
     def __init__(self):
         self.sent = []
 
+    refuse_with = None  # tests: set to ('limit', why) etc. to act like a refusal
+
     def send(self, to, subject, text, html=None):
+        return self.send_result(to, subject, text, html)[0] == 'sent'
+
+    def send_result(self, to, subject, text, html=None):
+        if self.refuse_with:
+            return self.refuse_with
         self.sent.append({'to': to, 'subject': subject, 'text': text})
-        return True
+        return 'sent', 'memory'
+
+
+def classify_refusal(status, detail):
+    """What a refusal from Resend means for trying again (see send_result)."""
+    text = (detail or '').lower()
+    if status == 429 and ('daily_quota' in text or 'monthly_quota' in text):
+        return 'limit', "Resend's daily email limit was reached. It goes out after the limit resets (6 pm Central in winter, 7 pm in summer)."
+    if status == 429 or status >= 500:
+        return 'retry', 'The email service was busy or down ({}).'.format(status)
+    return 'failed', 'The email service refused it ({}): {}'.format(status, (detail or '')[:200])
 
 
 def build_mailer(from_setting='MAIL_FROM'):

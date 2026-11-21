@@ -4,11 +4,23 @@
 <section class="card">
   <div class="row between"><h2>Messages the app would send</h2>
     <form method="post" action="{{ url_for('admin_messages_clear') }}"><button class="btn ghost">Clear</button></form></div>
-  <p class="muted" style="margin:0">In this test version nothing is actually emailed or texted. Everything lands here so you can read the wording. In the real app, texts go out through your Quo number at $0.01 per segment, so each text shows how many segments it would use.</p>
+  {% set svc = email_service() %}
+  <p class="muted" style="margin:0">Every message the app writes lands here, so you can read the wording.
+    {% if playdate_emails_on() and svc[0] == 'resend' %}Playdate emails are <b>sent for real</b>; each one shows whether it went out.
+    {% else %}Playdate emails are <b>not sent for real yet</b> (test mode).{% endif %}
+    Shop receipts follow the switch on the shop's Settings page. Texts go out through your Quo number later, at $0.01 per segment, so each text shows how many segments it would use.</p>
+  {% if svc[0] == 'broken' %}<div class="flash err" role="alert">{{ svc[1] }}</div>{% endif %}
   {% for m in rows %}
     <div class="card" style="gap:6px">
       <div class="row between"><span class="row" style="gap:6px"><span class="tag {{ 'in' if m.channel == 'text' }}">{{ m.channel }}</span>
         {% if m.channel == 'text' %}{% set seg = text_segments(m.body) %}<span class="seg {{ 'many' if seg.segments > 1 }}">{{ seg.chars }} characters · {{ seg.segments }} segment{{ 's' if seg.segments != 1 }}{% if not seg.plain %} · has a special character{% endif %}</span>{% endif %}</span><span class="muted">to {{ m.recipient }} · {{ m.created_at[:16].replace('T',' ') }}</span></div>
+      {% set st = email_state(m) %}
+      {% if st and st.label %}<div class="row" style="gap:8px;align-items:center">
+        <span class="tag {{ st.cls }}">{{ st.label }}{% if st.when %}: tries again {{ st.when }}{% endif %}</span>
+        {% if st.note %}<span class="muted" style="font-size:14px">{{ st.note }}</span>{% endif %}
+        {% if m.email_status in ('failed', 'waiting', 'off') %}<form method="post" action="{{ url_for('admin_message_send_again', oid=m.id) }}" style="margin-left:auto">
+          <button class="btn ghost small" data-once>Send again</button></form>{% endif %}
+      </div>{% endif %}
       {% if m.subject %}<b>{{ m.subject }}</b>{% endif %}
       <pre style="font-size:14px">{{ m.body }}</pre>
     </div>

@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+{% block title %}Emails{% endblock %}
+{% block body %}
+<section class="card">
+  <h1>Emails</h1>
+  {% set svc = email_service() %}
+  <p class="muted" style="margin:0">Every email the shop writes (order receipts with pass links, "your order is ready"), newest first.
+    {% if SS.shop_emails and svc[0] == 'resend' %}They're <b>sent for real</b>; each one shows whether it went out.
+    {% else %}Shop emails are <b>not sent for real</b> right now: turn them on under <a href="{{ url_for('admin_settings') }}#email">Settings</a>.{% endif %}</p>
+  {% if svc[0] == 'broken' %}<div class="flash err" role="alert">{{ svc[1] }}</div>{% endif %}
+  {% for m in emails %}{% set st = email_state(m) %}
+  <div class="card" style="gap:6px">
+    <div class="row between"><span class="tag {{ st.cls if st else 'grey' }}">{{ st.label if st and st.label else 'Written before email status existed' }}{% if st and st.when %}: tries again {{ st.when }}{% endif %}</span>
+      <span class="muted">to {{ m.recipient }} · {{ m.created_at[:16].replace('T', ' ') }}</span></div>
+    {% if st and st.note %}<div class="muted" style="font-size:14px">{{ st.note }}</div>{% endif %}
+    <b>{{ m.subject }}</b>
+    <details><summary class="muted">Show the email</summary><pre style="font-size:14px;white-space:pre-wrap">{{ m.body }}</pre></details>
+    {% if m.email_status in ('failed', 'waiting', 'off') %}<form method="post" action="{{ url_for('admin_email_send_again', oid=m.id) }}">
+      <button class="btn ghost small">Send again</button></form>{% endif %}
+  </div>
+  {% else %}<p class="muted">No shop emails yet.</p>{% endfor %}
+</section>
+{% endblock %}

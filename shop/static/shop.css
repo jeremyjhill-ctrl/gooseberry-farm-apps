@@ -183,3 +183,4 @@ label.inline>span{flex:1 1 auto;min-width:8em}
 .tag.unique{background:#F3E7F7;color:#6B2E7A}  /* One of a kind */
 .bookplay{flex-direction:row;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;text-decoration:none;color:inherit;border:2px solid var(--green)}
 .bookplay .btn{flex:0 0 auto}
+button:disabled{opacity:.6;cursor:wait}

@@ -131,3 +131,7 @@ pre{white-space:pre-wrap;font-family:inherit;margin:0}
 
 .linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--green);text-decoration:underline;cursor:pointer}
 .sum div span:last-child{white-space:nowrap;padding-left:8px}
+
+.tag.amber{background:#FFF1CC;color:#6B4E00}.tag.red{background:#FDE3E0;color:#9A2A1C}.tag.grey{background:#EEEFE8;color:#596158}
+.btn.small{min-height:34px;padding:0 10px;font-size:13px}
+button:disabled{opacity:.6;cursor:wait}

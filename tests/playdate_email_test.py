@@ -35,7 +35,11 @@ if len(sys.argv) > 1 and sys.argv[1] == "--book":
     code = c.post("/book/hold", data={"date": d, "start": start, "tickets": 3, "under2": 0}).headers["Location"].rstrip("/").split("/")[-1]
     c.post("/checkout/" + code, data={"name": "Mail Test", "email": "family@example.com", "phone": "4175550100", "agree": "on"})
     c.post("/pay/" + code, data={"card": "4242424242424242"})
-    print(json.dumps({"enabled": farm_mail.ENABLED, "sent": farm_mail.MAILER.sent if farm_mail.MAILER else []}))
+    m = farm_mail.get_mailer()[0]
+    row = farm_mail.dbcompat.connect(os.environ["PLAYDATE_DB"]).execute(
+        "SELECT email_status FROM outbox WHERE channel='email' ORDER BY id DESC").fetchone()
+    print(json.dumps({"enabled": farm_mail.switched_on(None, "playdates"), "sent": getattr(m, "sent", []) if m else [],
+                      "status": row[0] if row else None}))
     sys.exit(0)
 
 
@@ -53,10 +57,12 @@ out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 else {"
 check("booking runs with email on", r.returncode == 0, r.stderr[-400:])
 check("confirmation email sent to the family", [m["to"] for m in out["sent"]] == ["family@example.com"], out["sent"])
 check("it's the ticket email", out["sent"] and "Farm Baby Playdate" in out["sent"][0]["subject"] and "/t/" in out["sent"][0]["text"])
+check("Messages records it as sent", out.get("status") == "sent", out.get("status"))
 
 r = child({})
 out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 else {}
 check("email off by default: nothing sent", r.returncode == 0 and out.get("enabled") is False and out.get("sent") == [], r.stderr[-300:])
+check("Messages says email is off (test mode)", out.get("status") == "off", out.get("status"))
 
 r = child({"PLAYDATE_EMAILS": "on", "MAIL_PROVIDER": "resend"})
 check("half-set-up email stops the server instead of failing quietly", r.returncode != 0 and "RESEND_API_KEY" in r.stderr, r.stderr[-300:])

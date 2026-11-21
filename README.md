@@ -45,6 +45,10 @@ visible to you while you're logged in, with a banner.
 - `login_test.py`: 83 checks covering personal logins: setting up the owner login, adding Staci (playdates + shop) and
   Mollie (bakery only), first-login password change, forgot-password links, turning people off, the shared passwords
   retiring per app, and that Mollie's login pages never show the farm.
+- `email_status_test.py`: 31 checks covering email delivery status: sent, waiting at Resend's daily limit and going out
+  after the evening reset, short outages retried every 15 minutes (then marked not sent), hard refusals, Send again,
+  Clear keeping unsent emails, the farm's own daily limit, the shop's email switch, the Emails page and Home warning,
+  two server workers never sending the same email twice, and an email failure never breaking a booking.
 
 ## Logins
 Everyone has their own email + password (playdates/farm_auth.py). The owner ticks what each person can use on

@@ -36,7 +36,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402
-import farm_mail  # noqa: E402  (real email only when PLAYDATE_EMAILS=on, like the playdate messages)
+import farm_mail  # noqa: E402  (real email when the shop's switch is on; records sent / waiting / not sent)
 import farm_auth as fa  # noqa: E402  (personal logins)
 import farm_build  # noqa: E402  (the "Build 1a2b3c4" line at the bottom of each page)
 import farm_passes as fp  # noqa: E402
@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
     "shipping_flat": 6.0,      # one flat shipping charge per order that has anything to ship
     "pickup_note": "We'll email you when your order is ready to pick up at the farm.",
     "home_state": "MO",
+    "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
+    "email_daily_limit": farm_mail.DEFAULT_DAILY_LIMIT,  # leaves room in Resend's free 100 a day for Pasture Keeper
 }
 
 
@@ -337,9 +339,9 @@ def create_app():
         """Same as playdate messages: a copy in Playdate admin > Messages, real email when PLAYDATE_EMAILS=on."""
         if not to:
             return
-        db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (NULL, 'email', ?, ?, ?, ?)",
-                     (to, subject, body, now().isoformat()))
-        farm_mail.deliver(to, subject, body)
+        cur = db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (NULL, 'email', ?, ?, ?, ?)",
+                           (to, subject, body, now().isoformat()))
+        farm_mail.deliver(db(), cur.lastrowid, "shop")  # records sent / waiting / not sent on the message
 
     def save_photo(data_url):
         m = re.match(r"^data:image/(jpeg|png|webp);base64,(.+)$", data_url or "", re.S)
@@ -1164,6 +1166,48 @@ def create_app():
             return redirect(url_for("admin_settings"))
         return render_template("admin/settings.html", pd_tax=playdate_settings().get("tax_rate", 6.475),
                                own_tax=row("SELECT value FROM shop_settings WHERE key='tax_rate'"))
+
+    @app.post("/admin/settings/email")
+    @admin_required
+    def admin_settings_email():
+        f = request.form
+        save_setting("shop_emails", f.get("shop_emails") == "1")
+        try:
+            save_setting("email_daily_limit", max(0, min(100, int(f.get("email_daily_limit", "").strip() or farm_mail.DEFAULT_DAILY_LIMIT))))
+        except ValueError:
+            flash("The daily limit should be a whole number.")
+            return redirect(url_for("admin_settings") + "#email")
+        flash("Shop emails are now sent for real." if f.get("shop_emails") == "1" else "Shop emails are switched off: they only show on the Emails page.")
+        return redirect(url_for("admin_settings") + "#email")
+
+    def shop_emails(statuses=None):
+        sql = "SELECT * FROM outbox WHERE booking_id IS NULL AND channel='email'"
+        if statuses:
+            sql += " AND email_status IN ({})".format(",".join("?" * len(statuses)))
+        return rows(sql + " ORDER BY id DESC LIMIT 200", *(statuses or ()))
+
+    @app.get("/admin/emails")
+    @admin_required
+    def admin_emails():
+        return render_template("admin/emails.html", emails=shop_emails())
+
+    @app.post("/admin/emails/<int:oid>/send-again")
+    @admin_required
+    def admin_email_send_again(oid):
+        if not row("SELECT id FROM outbox WHERE id=? AND booking_id IS NULL", oid):
+            abort(404)
+        result = farm_mail.deliver(db(), oid, "shop", by_hand=True)
+        flash({"sent": "Sent.", "waiting": "Not sent yet: it's waiting and will go out by itself (see the note on it).",
+               "console": "No email service is connected here, so it only shows on this page."}.get(result, "It still couldn't be sent. See the note on it."))
+        return redirect(url_for("admin_emails"))
+
+    @app.before_request
+    def send_waiting_emails():
+        farm_mail.kick()  # at most every 5 minutes, in the background
+
+    app.jinja_env.globals.update(email_state=farm_mail.describe, email_service=farm_mail.service_status,
+                                 emails_sent_today=lambda: farm_mail.sent_today(db()),
+                                 emails_needing_attention=lambda: len(shop_emails(["waiting", "sending", "failed"])))
 
     @app.errorhandler(404)
     def not_found(e):

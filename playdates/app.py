@@ -239,10 +239,10 @@ def send(booking, channel, subject, body):
     recipient = booking.get("email") if channel == "email" else booking.get("phone")
     if channel == "text" and not booking.get("sms_ok"):
         return
-    db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (?,?,?,?,?,?)",
-                 (booking["id"], channel, recipient, subject, body, now().isoformat()))
+    cur = db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (?,?,?,?,?,?)",
+                       (booking["id"], channel, recipient, subject, body, now().isoformat()))
     if channel == "email":
-        farm_mail.deliver(recipient, subject, body)
+        farm_mail.deliver(db(), cur.lastrowid, "playdates")  # records sent / waiting / not sent on the message
 
 
 def ticket_link(code):

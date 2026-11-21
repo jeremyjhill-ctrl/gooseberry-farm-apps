@@ -1,6 +1,9 @@
 {% extends "admin/base.html" %}
 {% block title %}Shop admin{% endblock %}
 {% block body %}
+{% set waiting = emails_needing_attention() %}
+{% if waiting %}<a class="warn" role="alert" href="{{ url_for('admin_emails') }}" style="display:block;text-decoration:none;margin-bottom:14px">
+  {{ waiting }} email{{ 's' if waiting != 1 }} waiting or not sent. <u>See Emails</u></a>{% endif %}
 <div class="grid">
   <form method="post" action="{{ url_for('admin_visibility') }}" class="card">
     <input type="hidden" name="which" value="shop">

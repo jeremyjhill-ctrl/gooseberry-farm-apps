@@ -160,6 +160,8 @@ def ensure_schema(con):
     add_column(con, "shop_products", "custom_fields", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_order_lines", "answers", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_products", "one_of_a_kind", "INTEGER DEFAULT 0")  # added Nov 21, 2026
+    import farm_mail
+    farm_mail.ensure_schema(con, add_column)  # email status on Admin > Messages (added Nov 21, 2026)
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():
         if not con.execute("SELECT 1 FROM shop_credit_types").fetchone():
             for i, (name, value, role, farm) in enumerate(STARTER_TYPES):
@@ -599,6 +601,34 @@ def register(pd):
             return None
         return render_template("message.html", title=s.get("booking_hidden_title") or "Playdate booking isn't open yet",
                                body=s.get("booking_hidden_message") or BOOKING_HIDDEN_MESSAGE)
+
+    # ------------------------------------------------------------ email status on Admin > Messages
+    import farm_mail
+
+    @app.before_request
+    def send_waiting_emails():
+        farm_mail.kick()  # at most every 5 minutes, in the background
+
+    @app.post("/admin/messages/<int:oid>/send-again", endpoint="admin_message_send_again")
+    @pd.admin_required
+    def admin_message_send_again(oid):
+        r = pd.db().execute("SELECT booking_id, email_kind FROM outbox WHERE id=?", (oid,)).fetchone()
+        if not r:
+            abort(404)
+        kind = r[1] or ("playdates" if r[0] is not None else "shop")
+        result = farm_mail.deliver(pd.db(), oid, kind, by_hand=True)
+        flash({"sent": "Sent.", "waiting": "Not sent yet: it's waiting and will go out by itself (see the note on it).",
+               "console": "No email service is connected here, so it only shows on this page."}.get(result, "It still couldn't be sent. See the note on it."))
+        return redirect(url_for("admin_messages"))
+
+    def admin_messages_clear():
+        # Clear keeps emails that are still waiting to go out or weren't sent, so nothing is lost before it's dealt with.
+        pd.db().execute("DELETE FROM outbox WHERE NOT (channel='email' AND email_status IN ('waiting', 'sending', 'failed'))")
+        return redirect(url_for("admin_messages"))
+
+    app.view_functions["admin_messages_clear"] = pd.admin_required(admin_messages_clear)
+    app.jinja_env.globals.update(email_state=farm_mail.describe, email_service=farm_mail.service_status,
+                                 playdate_emails_on=lambda: farm_mail.switched_on(pd.db(), "playdates"))
 
     @app.post("/admin/booking-visibility", endpoint="admin_booking_visibility")
     @pd.admin_required
