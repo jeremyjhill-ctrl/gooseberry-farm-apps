@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+{% block title %}Shipping label · {{ pretty_code(o.code) }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block body %}
+<a href="{{ url_for('admin_order', code=o.code) }}" style="font-weight:700;text-decoration:none">‹ Order {{ pretty_code(o.code) }}</a>
+<section class="card">
+  <div class="row between"><h1>Shipping label</h1>{% if label_mode == 'test' %}<span class="tag amber">Practice labels</span>{% endif %}</div>
+  <div class="muted">To <b>{{ o.ship_name or o.name }}</b>, {{ o.ship_line1 }}{% if o.ship_line2 %}, {{ o.ship_line2 }}{% endif %}, {{ o.ship_city }}, {{ o.ship_state }} {{ o.ship_zip }}</div>
+  {% if problem %}
+  <div class="warn" role="alert">{{ problem }}</div>
+  {% else %}
+  {% if labels %}<div class="warn" role="alert">This order already has a label. Only buy another if you're sending a second box.</div>{% endif %}
+  {% if missing %}<div class="muted">Add a packed weight and box size to <b>{{ missing|join(', ') }}</b> (on the product) and this fills itself in next time.</div>{% endif %}
+  <form method="get" class="pkg" data-no-lock>
+    <label>Pounds <input type="number" name="lb" min="0" step="1" inputmode="numeric" value="{{ ((weight or 0) // 16)|int if weight else '' }}"></label>
+    <label>Ounces <input type="number" name="oz" min="0" step="0.1" inputmode="decimal" value="{{ '%g'|format((weight or 0) % 16) if weight else '' }}"></label>
+    <label class="boxin">Box, inches <input type="text" name="box" value="{{ box_text }}" placeholder="10x8x4"></label>
+    <button class="btn ghost">Update prices</button>
+  </form>
+  {% if error %}<div class="flash err" role="alert">{{ error }}</div>{% endif %}
+  {% if rates %}
+  <div class="muted">Prices for this package. The cheapest is first. Prints on: {{ label_size }}.</div>
+  <form method="post" action="{{ url_for('admin_label_buy', code=o.code) }}" class="rates">
+    <input type="hidden" name="weight_oz" value="{{ weight }}"><input type="hidden" name="box" value="{{ box_text }}">
+    {% if labels %}<input type="hidden" name="another" value="1">{% endif %}
+    <label class="inline"><input type="checkbox" name="tell" value="1" {{ 'checked' if label_mode != 'test' }}> <span>Email the buyer their tracking number</span></label>
+    {% for r in rates %}
+    <div class="rate{{ ' best' if loop.first }}">
+      <div class="ratewho"><b>{{ r.carrier }} {{ r.service }}</b>
+        <span class="muted">{% if r.days %}about {{ r.days }} day{{ 's' if r.days != 1 }}{% elif r.terms %}{{ r.terms }}{% endif %}{% if loop.first %} · cheapest{% endif %}</span></div>
+      <button class="btn{{ '' if loop.first else ' ghost' }}" name="pick" value="{{ loop.index0 }}">Buy {{ money(r.amount) }}</button>
+      <input type="hidden" name="rate_{{ loop.index0 }}" value="{{ r.id }}|{{ r.amount }}|{{ r.carrier }}|{{ r.service }}">
+    </div>
+    {% endfor %}
+  </form>
+  {% elif not error %}
+  <div class="muted">Enter the package's weight and box size to see prices.</div>
+  {% endif %}
+  {% endif %}
+</section>
+{% if label_mode == 'test' %}<div class="muted">Practice mode: labels are free and can't be mailed. "Email the buyer their tracking number" starts unticked so customers don't get practice tracking numbers.</div>{% endif %}
+<style>
+.rate{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;border:1px solid #E3E5DC;border-radius:12px;padding:10px 12px}
+.rate.best{border:2px solid var(--green)}
+.ratewho{flex:1 1 200px;display:flex;flex-direction:column}
+.rates{display:flex;flex-direction:column;gap:10px}
+.pkg{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;align-items:end}
+.pkg .boxin{grid-column:span 2}
+</style>
+{% endblock %}

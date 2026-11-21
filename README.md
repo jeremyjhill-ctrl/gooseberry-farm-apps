@@ -11,6 +11,9 @@ One program, one server, several storefronts:
   Card payments: **Stripe Checkout** once `FARM_STRIPE_SECRET_KEY` is set on Render (plus `FARM_STRIPE_WEBHOOK_SECRET`
   from a Stripe webhook to `/shop/stripe/webhook` for checkout.session.completed and checkout.session.expired; the
   shop's Settings page shows the exact address). Without a key (as on the Mac) it uses the test card stand-in.
+  Shipping labels: **Print a shipping label** on a shipped order, through Shippo, once `SHIPPO_API_KEY` is set
+  (shippo_test_ for free practice labels). Return address and label size (4x6 or plain paper) in shop Settings;
+  each shippable product has a packed weight and box size.
 
 - **Farm Baby Playdates** booking (`playdates/`): the booking app, unchanged except that it can also use the
   live server's database (`playdates/dbcompat.py`). Still in **test mode**: test card only, messages show in Admin > Messages.
@@ -53,6 +56,10 @@ visible to you while you're logged in, with a banner.
   backing out, a payment made after the hold ran out, Stripe being down, a double-tap opening only one payment page,
   test-buying while the shop is hidden, and the bakery reading Stripe's messages. `STRIPE_REAL=1` uses the real
   Stripe library for the signature checks.
+- `label_test.py`: 53 checks covering shipping labels through Shippo: packed weight and box per product, the return
+  address, prices cheapest first, one tap buying the chosen label (4x6 or plain paper), the order marked shipped and the
+  buyer emailed tracking, Print label, void, Shippo refusing or unreachable, a double-tap buying only one label, and
+  login checks. Includes the real Shippo connection code against a local pretend Shippo.
 - `email_status_test.py`: 31 checks covering email delivery status: sent, waiting at Resend's daily limit and going out
   after the evening reset, short outages retried every 15 minutes (then marked not sent), hard refusals, Send again,
   Clear keeping unsent emails, the farm's own daily limit, the shop's email switch, the Emails page and Home warning,

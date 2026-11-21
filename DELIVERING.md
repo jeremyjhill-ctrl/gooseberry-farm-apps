@@ -35,3 +35,17 @@ published commit to a BUILD file. When delivering, tell Jeremy "build <short com
   any admin page at 1300 / 820 / 390 px wide.
 - `gunicorn.conf.py` sets keepalive = 130 (longer than Render's ~120 s connection reuse). Without it, form saves
   were sometimes lost before reaching the app (Safari showed "server unexpectedly dropped the connection").
+
+## Copying files to the Mac
+Deliver only `_pending/farm-apps.bundle`. Never replace a `.command` file on the Mac directly: the copy tool writes
+plain files without the "can be run" permission, so Jeremy would have to `chmod +x` it again (happened twice, Nov 21).
+Publish Farm Apps updates the folder's code from git after publishing, which keeps the permission, so a changed
+`.command` (e.g. a new check added to Publish) reaches the Mac by itself at the next publish.
+
+## Payments and labels (Nov 21, 2026)
+- Stripe Checkout: `tests/stripe_test.py` (stand-in Stripe; `STRIPE_REAL=1` uses the real library for signatures).
+  Stripe's library v17 objects don't support `.get()`: convert with `.to_dict()` before reading.
+- Shipping labels: `playdates/farm_shippo.py` (stdlib only, no new packages), `tests/label_test.py` (stand-in Shippo,
+  plus a local pretend-Shippo web server for the real connection code). Stripe and Shippo aren't reachable from
+  Claude's workspace, so all checks use stand-ins; the live proof is Jeremy's test purchase / practice label.
+

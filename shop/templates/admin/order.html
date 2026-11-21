@@ -15,6 +15,33 @@
     <div class="total"><span>Total</span><span>{{ money(o.total) }}</span></div>
   </div>
   {% if o.ship_line1 %}<div class="note"><b>Ship to</b><br>{{ o.ship_name }}<br>{{ o.ship_line1 }}{% if o.ship_line2 %}<br>{{ o.ship_line2 }}{% endif %}<br>{{ o.ship_city }}, {{ o.ship_state }} {{ o.ship_zip }}</div>{% endif %}
+  {% if o.status == 'paid' and o.ship_line1 and o.lines|selectattr('fulfillment', 'equalto', 'ship')|list %}
+  <div class="labels" id="labels">
+    {% set active = labels|selectattr('status', 'equalto', 'bought')|list %}
+    {% for lab in labels %}
+    <div class="labelrow{{ ' voided' if lab.status != 'bought' }}">
+      <div><b>{{ lab.carrier }} {{ lab.service }}</b> {% if lab.cost %}{{ money(lab.cost) }}{% endif %}
+        {% if lab.test %}<span class="tag amber">practice</span>{% endif %}{% if lab.status != 'bought' %}<span class="tag grey">voided</span>{% endif %}
+        <div class="muted">{{ (lab.created_at or '')[:16].replace('T', ' ') }}{% if lab.tracking %} · tracking {% if lab.tracking_url %}<a href="{{ lab.tracking_url }}" target="_blank" rel="noopener">{{ lab.tracking }}</a>{% else %}{{ lab.tracking }}{% endif %}{% endif %}</div></div>
+      {% if lab.status == 'bought' %}
+      <div class="row">
+        <a class="btn" href="{{ url_for('admin_label_print', code=o.code, lid=lab.id) }}" target="_blank" rel="noopener">Print label</a>
+        <details class="void"><summary class="linkbtn">Void…</summary>
+          <form method="post" action="{{ url_for('admin_label_void', code=o.code, lid=lab.id) }}">
+            <div class="muted">Only if the label won't be used. Shippo refunds the postage once the carrier confirms.</div>
+            <button class="btn ghost small">Void this label</button></form></details>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if label_problem %}<div class="muted">{{ label_problem }}</div>
+    {% elif not active %}<a class="btn big" href="{{ url_for('admin_label', code=o.code) }}">Print a shipping label</a>
+    {% else %}<a class="linkbtn" href="{{ url_for('admin_label', code=o.code) }}">Buy another label (second box)</a>{% endif %}
+  </div>
+  <style>.labels{display:flex;flex-direction:column;gap:10px;border-top:1px solid #EEEFE8;padding-top:12px}
+  .labelrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+  .labelrow.voided{opacity:.6}.void summary{list-style:none;cursor:pointer}.void[open]{flex-basis:100%}</style>
+  {% endif %}
   {% if o.status == 'paid' and o.lines|selectattr('fulfillment', 'in', ['ship', 'pickup'])|list %}
   <form method="post" action="{{ url_for('admin_order_fulfilled', code=o.code) }}" class="row">
     {% if o.fulfilled_at %}<span class="tag">Done {{ o.fulfilled_at[:10] }}</span><input type="hidden" name="undo" value="1"><button class="linkbtn">Not done yet</button>

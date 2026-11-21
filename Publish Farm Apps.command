@@ -96,7 +96,13 @@ if [ -f "$WORK/tests/stripe_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "
   cat /tmp/farm-stripe.json; tail -20 /tmp/farm-stripe.log
   pause; exit 1
 fi
-echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')$([ -f /tmp/farm-logins.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-logins.json"));print(",",d["passed"],"of",d["total"],"logins")' | tr -d '\n')$([ -f /tmp/farm-emailstatus.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-emailstatus.json"));print(",",d["passed"],"of",d["total"],"email status")' | tr -d '\n')$([ -f /tmp/farm-stripe.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-stripe.json"));print(",",d["passed"],"of",d["total"],"Stripe")' | tr -d '\n')."
+rm -f /tmp/farm-labels.json
+if [ -f "$WORK/tests/label_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/label_test.py > /tmp/farm-labels.json 2>/tmp/farm-labels.log); then
+  echo "STOPPED: the shipping labels check failed on this delivery, so nothing was published."
+  cat /tmp/farm-labels.json; tail -20 /tmp/farm-labels.log
+  pause; exit 1
+fi
+echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')$([ -f /tmp/farm-logins.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-logins.json"));print(",",d["passed"],"of",d["total"],"logins")' | tr -d '\n')$([ -f /tmp/farm-emailstatus.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-emailstatus.json"));print(",",d["passed"],"of",d["total"],"email status")' | tr -d '\n')$([ -f /tmp/farm-stripe.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-stripe.json"));print(",",d["passed"],"of",d["total"],"Stripe")' | tr -d '\n')$([ -f /tmp/farm-labels.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-labels.json"));print(",",d["passed"],"of",d["total"],"labels")' | tr -d '\n')."
 
 echo
 echo "Checking what's on GitHub now..."

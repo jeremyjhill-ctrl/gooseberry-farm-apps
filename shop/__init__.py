@@ -18,6 +18,7 @@ Settings (environment variables):
   FARM_STRIPE_SECRET_KEY      the farm's Stripe secret key (sk_test_... first, sk_live_... for real sales).
                               Blank = the test card stand-in (how it runs on the Mac).
   FARM_STRIPE_WEBHOOK_SECRET  from the farm's Stripe webhook for <site>/shop/stripe/webhook (whsec_...)
+  SHIPPO_API_KEY              shipping labels through Shippo (shippo_test_... practice, shippo_live_... real postage)
 """
 import base64
 import csv
@@ -44,6 +45,7 @@ import farm_mail  # noqa: E402  (real email when the shop's switch is on; record
 import farm_auth as fa  # noqa: E402  (personal logins)
 import farm_build  # noqa: E402  (the "Build 1a2b3c4" line at the bottom of each page)
 import farm_passes as fp  # noqa: E402
+import farm_shippo  # noqa: E402  (shipping labels)
 
 try:
     import qrcode
@@ -75,7 +77,11 @@ DEFAULT_SETTINGS = {
     "home_state": "MO",
     "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
     "email_daily_limit": farm_mail.DEFAULT_DAILY_LIMIT,  # leaves room in Resend's free 100 a day for Pasture Keeper
+    "ship_from": {"name": "Gooseberry Bridge Farm", "street1": "", "street2": "", "city": "Rogersville", "state": "MO",
+                  "zip": "", "phone": ""},  # the return address on shipping labels
+    "label_size": "PDF_4x6",   # PDF_4x6 for a 4x6 label printer, PDF for plain 8.5x11 paper
 }
+LABEL_SIZES = {"PDF_4x6": "4×6 label printer", "PDF": "Plain paper (8.5×11)"}
 
 
 def money(x):
@@ -1055,6 +1061,13 @@ def create_app():
                 "valid_until": f.get("valid_until", "").strip(), "terms": f.get("terms", "").strip(),
                 "sort": num("sort", int) or 0, "photo_view": photo_view_from_form(f), "custom_fields": questions_from_form(f),
             }
+            if kind != "pass":
+                lb, oz = num("ship_lb"), num("ship_oz")
+                fields["ship_weight_oz"] = round((lb or 0) * 16 + (oz or 0), 2) if (lb or oz) else None
+                dims = [num("box_" + d) for d in "lwh"]
+                if any(dims) and not all(d and d > 0 for d in dims):
+                    errors.append("Please fill in all three box measurements (length, width, height), or leave them all blank.")
+                fields["ship_box"] = "x".join("{:g}".format(d) for d in dims) if all(dims) else ""
             if fields["one_of_a_kind"]:
                 fields["stock_limit"], fields["per_order_limit"] = 1, 1  # just the one
             if f.get("photo_data", "").startswith("data:"):
@@ -1245,7 +1258,8 @@ def create_app():
         dash = ""
         if (o.get("stripe_payment") or "").startswith("pi_"):
             dash = "https://dashboard.stripe.com/{}payments/{}".format("test/" if stripe_mode == "test" else "", o["stripe_payment"])
-        return render_template("admin/order.html", o=o, stripe_link=dash)
+        return render_template("admin/order.html", o=o, stripe_link=dash, labels=order_labels(o), label_problem=label_ready(o),
+                               label_mode=farm_shippo.mode())
 
     @app.post("/admin/orders/<code>/fulfilled")
     @admin_required
@@ -1261,6 +1275,192 @@ def create_app():
                                                               url_for("order", code=o["code"], _external=True)))
         flash("Marked {}.".format("not done yet" if undo else "done"))
         return redirect(url_for("admin_order", code=o["code"]))
+
+    # ---- shipping labels (Shippo)
+    def parse_box(text):
+        try:
+            dims = [float(x) for x in str(text or "").lower().replace("×", "x").split("x")]
+            return tuple(dims) if len(dims) == 3 and all(d > 0 for d in dims) else None
+        except ValueError:
+            return None
+
+    def num_or_none(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    def order_labels(o):
+        return rows("SELECT * FROM shop_labels WHERE order_id=? ORDER BY id", o["id"])
+
+    def shipping_lines(o):
+        return [l for l in o["lines"] if l["fulfillment"] == "ship"]
+
+    def parcel_guess(o):
+        """The package for this order from its products' packed weights and boxes: weights add up, the biggest box wins.
+        Returns (weight_oz or None, box tuple or None, [names of items missing a weight or box])."""
+        weight, box, missing = 0.0, None, []
+        for l in shipping_lines(o):
+            p = row("SELECT name, ship_weight_oz, ship_box FROM shop_products WHERE id=?", l["product_id"]) or {}
+            b = parse_box(p.get("ship_box"))
+            if not p.get("ship_weight_oz") or not b:
+                missing.append(l["name"])
+            weight += float(p.get("ship_weight_oz") or 0) * int(l["qty"])
+            if b and (not box or b[0] * b[1] * b[2] > box[0] * box[1] * box[2]):
+                box = b
+        return (round(weight, 2) or None), box, missing
+
+    def ship_to(o):
+        a = {"name": o["ship_name"] or o["name"], "street1": o["ship_line1"], "street2": o["ship_line2"] or "",
+             "city": o["ship_city"], "state": o["ship_state"], "zip": o["ship_zip"], "country": "US"}
+        if o.get("phone"):
+            a["phone"] = o["phone"]
+        return a
+
+    def ship_from():
+        s = settings()["ship_from"] or {}
+        return dict({k: (s.get(k) or "") for k in ("name", "street1", "street2", "city", "state", "zip", "phone")}, country="US")
+
+    def ship_from_problem():
+        s = ship_from()
+        if not (s["street1"] and s["city"] and s["state"] and s["zip"]):
+            return "Add the farm's return address in Settings > Shipping labels first."
+        return ""
+
+    def label_ready(o):
+        """Why this order can't have a label right now ('' when it can)."""
+        if farm_shippo.mode() == "off":
+            return "Shipping labels aren't set up yet (Settings > Shipping labels)."
+        if o["status"] != "paid":
+            return "Only paid orders get labels."
+        if not shipping_lines(o) or not o["ship_line1"]:
+            return "Nothing in this order is being shipped."
+        return ship_from_problem()
+
+    @app.route("/admin/orders/<code>/label", methods=["GET", "POST"])
+    @admin_required
+    def admin_label(code):
+        """Prices for this order's package, cheapest first; one tap buys the label."""
+        o = order_by_code(code)
+        problem = label_ready(o)
+        guess_w, guess_box, missing = parcel_guess(o)
+        f = request.values
+        weight = guess_w
+        if f.get("lb") or f.get("oz"):  # staff changed the weight on this page
+            try:
+                weight = round(float(f.get("lb") or 0) * 16 + float(f.get("oz") or 0), 2) or None
+            except ValueError:
+                weight = None
+        box = parse_box(f.get("box")) if f.get("box") else guess_box
+        rates, error, shipment = [], "", ""
+        if not problem and weight and box:
+            try:
+                shipment, rates = farm_shippo.rates(ship_from(), ship_to(o), weight, box)
+            except farm_shippo.ShippoError as e:
+                error = str(e)
+        return render_template("admin/label.html", o=o, problem=problem, rates=rates, error=error, weight=weight, box=box,
+                               missing=missing, labels=[x for x in order_labels(o) if x["status"] == "bought"],
+                               box_text="x".join("{:g}".format(d) for d in box) if box else "",
+                               label_mode=farm_shippo.mode(), label_size=LABEL_SIZES.get(settings()["label_size"], ""))
+
+    @app.post("/admin/orders/<code>/label/buy")
+    @admin_required
+    def admin_label_buy(code):
+        o = order_by_code(code)
+        problem = label_ready(o)
+        if problem:
+            flash(problem)
+            return redirect(url_for("admin_order", code=o["code"]))
+        f = request.form.to_dict()
+        if f.get("pick", "").isdigit():  # the label page: one form, a Buy button per price
+            rid, amount, carrier, service = (f.get("rate_" + f["pick"], "").split("|", 3) + ["", "", "", ""])[:4]
+            f.update(rate=rid, cost=amount, carrier=carrier, service=service)
+        if any(x["status"] == "bought" for x in order_labels(o)) and f.get("another") != "1":
+            flash("This order already has a label. Print that one, or void it first.")
+            return redirect(url_for("admin_order", code=o["code"]))
+        # One purchase at a time per order, so a double-tap can't buy (and pay for) two labels.
+        mine = "buying:{:.3f}".format(time.time())
+        stale = "buying:{:.3f}".format(time.time() - 90)
+        con = db()
+        if con.execute("UPDATE shop_orders SET label_claim=? WHERE id=? AND (COALESCE(label_claim, '')='' OR label_claim < ?)",
+                       (mine, o["id"], stale)).rowcount != 1:
+            flash("A label for this order is being bought right now. Give it a moment, then check below.")
+            return redirect(url_for("admin_order", code=o["code"]))
+        try:
+            try:
+                got = farm_shippo.buy(f.get("rate", ""), settings()["label_size"], fp.pretty_code(o["code"]))
+            except farm_shippo.ShippoError as e:
+                flash("No label was bought: {}".format(e))
+                return redirect(url_for("admin_label", code=o["code"]))
+            try:
+                cost = float(f.get("cost") or 0)
+            except ValueError:
+                cost = None
+            con.execute("""INSERT INTO shop_labels(order_id, shippo_id, carrier, service, cost, tracking, tracking_url, weight_oz, box,
+                           status, test, created_at, created_by) VALUES (?,?,?,?,?,?,?,?,?, 'bought', ?, ?, ?)""",
+                        (o["id"], got["id"], f.get("carrier", "")[:40], f.get("service", "")[:80], cost, got["tracking"], got["tracking_url"],
+                         num_or_none(f.get("weight_oz")), f.get("box", "")[:40], 1 if farm_shippo.mode() == "test" else 0,
+                         now().isoformat(), "staff"))
+            pickup_too = any(l["fulfillment"] == "pickup" for l in o["lines"])
+            if not o["fulfilled_at"] and not pickup_too:
+                con.execute("UPDATE shop_orders SET fulfilled_at=?, fulfilled_by=? WHERE id=?", (now().isoformat(), "label", o["id"]))
+            if f.get("tell") == "1":
+                body = ["Hi {}! Your order {} is on its way.".format(o["name"].split(" ")[0], fp.pretty_code(o["code"])), ""]
+                if got["tracking"]:
+                    body.append("{} tracking number: {}".format(f.get("carrier") or "Tracking", got["tracking"]))
+                if got["tracking_url"]:
+                    body.append(got["tracking_url"])
+                body += ["", "Your order: " + url_for("order", code=o["code"], _external=True)]
+                send_email(o["email"], "Your {} order has shipped".format(settings()["shop_name"]), "\n".join(body))
+        finally:
+            con.execute("UPDATE shop_orders SET label_claim='' WHERE id=? AND label_claim=?", (o["id"], mine))
+        flash("Label bought{}. Tap Print label.".format(" (practice label: no real postage)" if farm_shippo.mode() == "test" else ""))
+        return redirect(url_for("admin_order", code=o["code"]))
+
+    def label_or_404(code, lid):
+        o = order_by_code(code)
+        lab = row("SELECT * FROM shop_labels WHERE id=? AND order_id=?", lid, o["id"])
+        if not lab:
+            abort(404)
+        return o, lab
+
+    @app.get("/admin/orders/<code>/labels/<int:lid>/print")
+    @admin_required
+    def admin_label_print(code, lid):
+        o, lab = label_or_404(code, lid)
+        try:
+            return redirect(farm_shippo.label_link(lab["shippo_id"]))  # Shippo's links expire, so ask for a fresh one each time
+        except farm_shippo.ShippoError as e:
+            flash("Couldn't open the label: {}".format(e))
+            return redirect(url_for("admin_order", code=o["code"]))
+
+    @app.post("/admin/orders/<code>/labels/<int:lid>/void")
+    @admin_required
+    def admin_label_void(code, lid):
+        o, lab = label_or_404(code, lid)
+        if lab["status"] != "bought":
+            return redirect(url_for("admin_order", code=o["code"]))
+        try:
+            farm_shippo.void(lab["shippo_id"])
+        except farm_shippo.ShippoError as e:
+            flash("The label wasn't voided: {}".format(e))
+            return redirect(url_for("admin_order", code=o["code"]))
+        db().execute("UPDATE shop_labels SET status='voided', voided_at=? WHERE id=?", (now().isoformat(), lab["id"]))
+        if o["fulfilled_by"] == "label" and not any(x["status"] == "bought" for x in order_labels(o)):
+            db().execute("UPDATE shop_orders SET fulfilled_at=NULL, fulfilled_by=NULL WHERE id=?", (o["id"],))
+        flash("Label voided. Shippo returns the postage once the carrier confirms it wasn't used (usually within a few weeks). "
+              "Don't use that label.")
+        return redirect(url_for("admin_order", code=o["code"]))
+
+    @app.post("/admin/settings/labels")
+    @admin_required
+    def admin_settings_labels():
+        f = request.form
+        save_setting("ship_from", {k: f.get("from_" + k, "").strip()[:100] for k in ("name", "street1", "street2", "city", "state", "zip", "phone")})
+        if f.get("label_size") in LABEL_SIZES:
+            save_setting("label_size", f["label_size"])
+        flash("Shipping label settings saved.")
+        return redirect(url_for("admin_settings") + "#labels")
 
     @app.get("/admin/orders.csv")
     @admin_required
@@ -1354,7 +1554,8 @@ def create_app():
         return render_template("admin/settings.html", pd_tax=playdate_settings().get("tax_rate", 6.475),
                                own_tax=row("SELECT value FROM shop_settings WHERE key='tax_rate'"),
                                stripe_mode=stripe_mode, stripe_webhook_set=bool(webhook_secret), stripe_events=STRIPE_EVENTS,
-                               webhook_url=url_for("stripe_webhook", _external=True))
+                               webhook_url=url_for("stripe_webhook", _external=True),
+                               label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES)
 
     @app.post("/admin/settings/email")
     @admin_required

@@ -98,6 +98,17 @@ CREATE TABLE IF NOT EXISTS shop_order_lines (
   fulfillment TEXT, taxable INTEGER, gift_for TEXT,
   answers TEXT DEFAULT ''              -- the buyer's answers to the product's questions (JSON)
 );
+CREATE TABLE IF NOT EXISTS shop_labels (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL,
+  shippo_id TEXT NOT NULL,             -- Shippo's transaction id (for a fresh label link, or to void it)
+  carrier TEXT, service TEXT, cost REAL,
+  tracking TEXT DEFAULT '', tracking_url TEXT DEFAULT '',
+  weight_oz REAL, box TEXT DEFAULT '',
+  status TEXT DEFAULT 'bought',        -- bought | voided (money back asked for)
+  test INTEGER DEFAULT 0,              -- a free practice label from Shippo's test key
+  created_at TEXT, created_by TEXT, voided_at TEXT
+);
 CREATE TABLE IF NOT EXISTS shop_passes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL,
@@ -166,6 +177,11 @@ def ensure_schema(con):
     add_column(con, "shop_orders", "stripe_payment", "TEXT DEFAULT ''")
     add_column(con, "shop_orders", "amount_paid", "INTEGER")
     add_column(con, "shop_orders", "pay_note", "TEXT DEFAULT ''")
+    # Shipping labels, added Nov 21, 2026: each shippable product's packed weight (ounces) and box ("10x8x4", inches),
+    # and a claim so a double-tap can't buy two labels for one order.
+    add_column(con, "shop_products", "ship_weight_oz", "REAL")
+    add_column(con, "shop_products", "ship_box", "TEXT DEFAULT ''")
+    add_column(con, "shop_orders", "label_claim", "TEXT DEFAULT ''")
     import farm_mail
     farm_mail.ensure_schema(con, add_column)  # email status on Admin > Messages (added Nov 21, 2026)
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():
