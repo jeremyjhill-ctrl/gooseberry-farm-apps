@@ -13,6 +13,7 @@
     <label>"Value" price (optional) <input type="text" name="value_price" inputmode="decimal" value="{{ p.value_price|plain }}" placeholder="150"></label>
   </div>
   {% if kind == 'pass' %}
+  <div class="muted"><b>Electronic delivery:</b> the buyer gets each pass by email right after paying, plus a printable gift certificate when they enter a gift name. Nothing to ship or pick up.</div>
   <h2 style="margin-top:6px">What's on the pass</h2>
   <p class="muted" style="margin:0">Pick a credit and how many. Make new kinds of credits on the <a href="{{ url_for('admin_credits') }}">Credits</a> page.</p>
   {% set rows_ = p.credits + [{}] * (8 - p.credits|length) %}
@@ -28,11 +29,12 @@
   <label>Credits work through <input type="date" name="valid_until" value="{{ p.valid_until or '' }}"></label>
   <div class="muted">After that date the pass stops working. Customers see the season wording, not the date, unless you put it there.</div>
   {% else %}
-  <label>How it gets to them
-    <select name="fulfillment">
-      <option value="pickup" {{ 'selected' if p.fulfillment == 'pickup' }}>Picked up at the farm</option>
-      <option value="ship" {{ 'selected' if p.fulfillment == 'ship' }}>Shipped (adds the flat shipping charge)</option>
-      <option value="none" {{ 'selected' if p.fulfillment == 'none' }}>Nothing to hand over</option></select></label>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <b style="font-size:14px">How it gets to them</b>
+    <label class="inline"><input type="checkbox" name="can_ship" value="1" {{ 'checked' if p.fulfillment in ('ship', 'both') }}> <span>Can be shipped (adds the flat shipping charge)</span></label>
+    <label class="inline"><input type="checkbox" name="can_pickup" value="1" {{ 'checked' if p.fulfillment in ('pickup', 'both') }}> <span>Can be picked up at the farm</span></label>
+    <div class="muted">Tick both and the buyer chooses at checkout. Tick neither for <b>electronic delivery</b> (nothing to ship or pick up; the buyer just gets the order email).</div>
+  </div>
   {% endif %}
   <label>Description <textarea name="description" rows="4">{{ p.description or '' }}</textarea></label>
   <label>Photo

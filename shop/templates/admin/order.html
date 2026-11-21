@@ -7,7 +7,7 @@
   <div class="row between"><h1>{{ o.name }}</h1><span class="tag {{ '' if o.status == 'paid' else 'grey' }}">{{ o.status }}</span></div>
   <div class="muted">Order <span class="code">{{ pretty_code(o.code) }}</span> · {{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }} · {{ o.email }}{% if o.phone %} · {{ o.phone }}{% endif %}</div>
   <div class="sum">
-    {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }} <span class="muted">({{ {'ship': 'ship', 'pickup': 'pick up', 'pass': 'pass', 'none': ''}.get(l.fulfillment, '') }})</span></span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
+    {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }} <span class="muted">({{ {'ship': 'ship', 'pickup': 'pick up', 'pass': 'pass, electronic delivery', 'none': 'electronic delivery'}.get(l.fulfillment, '') }})</span></span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
     {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}
     <div><span>Sales tax</span><span>{{ money(o.tax) }}</span></div>
     <div class="total"><span>Total</span><span>{{ money(o.total) }}</span></div>

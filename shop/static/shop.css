@@ -50,6 +50,7 @@ label{font-weight:700;font-size:14px;display:flex;flex-direction:column;gap:6px}
 label.inline{flex-direction:row;align-items:flex-start;gap:10px;font-weight:600}
 input[type=text],input[type=email],input[type=tel],input[type=number],input[type=date],input[type=time],input[type=password],select{height:46px;border:1px solid #C9CEC0;border-radius:10px;padding:0 12px;font-size:16px;background:#fff;font-family:inherit}
 input[type=checkbox]{width:22px;height:22px;accent-color:var(--green);margin:0;flex:0 0 auto}
+input[type=radio]{width:22px;height:22px;accent-color:var(--green);margin:0;flex:0 0 auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 table{width:100%;border-collapse:collapse;font-size:15px}
 th{text-align:left;color:var(--muted);font-size:13px;padding:8px 6px;border-bottom:2px solid var(--line)}

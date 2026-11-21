@@ -259,10 +259,18 @@ def create_app():
             lines.append({"product": p, "qty": qty, "amount": round(float(p["price"]) * qty, 2)})
         return lines
 
-    def totals(lines, ship_state=""):
+    def how_for(p, how):
+        """How this item gets to the buyer: items that can be shipped or picked up follow the buyer's choice."""
+        if p["fulfillment"] == "both":
+            return how if how in ("ship", "pickup") else ""
+        return p["fulfillment"]
+
+    def totals(lines, ship_state="", how=""):
         s = settings()
         sub = round(sum(l["amount"] for l in lines), 2)
-        ships = any(l["product"]["fulfillment"] == "ship" for l in lines)
+        choice = any(l["product"]["fulfillment"] == "both" for l in lines)
+        ship_always = any(l["product"]["fulfillment"] == "ship" for l in lines)
+        ships = any(how_for(l["product"], how) == "ship" for l in lines)
         shipping = round(float(s["shipping_flat"] or 0), 2) if ships else 0.0
         state = (ship_state or "").strip().upper()
         home = (s.get("home_state") or "MO").upper()
@@ -271,11 +279,13 @@ def create_app():
             p = l["product"]
             if not p["taxable"]:
                 continue
-            if p["fulfillment"] == "ship" and state and state != home:
+            if how_for(p, how) == "ship" and state and state != home:
                 continue  # shipped out of state: no Missouri tax (mirrors how Square handled it)
             taxable += l["amount"]
         tax = round(taxable * float(s["tax_rate"]) / 100.0, 2)
-        return {"sub": sub, "shipping": shipping, "tax": tax, "total": round(sub + shipping + tax, 2), "ships": ships}
+        return {"sub": sub, "shipping": shipping, "tax": tax, "total": round(sub + shipping + tax, 2), "ships": ships,
+                "choice": choice, "ship_always": ship_always, "how": how if choice else "",
+                "flat": round(float(s["shipping_flat"] or 0), 2)}
 
     def housekeeping():
         db().execute("UPDATE shop_orders SET status='expired' WHERE status='pending' AND hold_expires < ?", (now().isoformat(),))
@@ -418,7 +428,12 @@ def create_app():
         if request.method == "POST":
             name, email, phone = f.get("name", "").strip(), f.get("email", "").strip(), f.get("phone", "").strip()
             ship = {k: f.get("ship_" + k, "").strip() for k in ("name", "line1", "line2", "city", "state", "zip")}
-            t = totals(lines, ship["state"])
+            how = f.get("how", "")
+            t = totals(lines, ship["state"], how)
+            if t["choice"] and how not in ("ship", "pickup"):
+                errors.append("Please choose whether to have it shipped or pick it up at the farm.")
+            if not t["ships"]:
+                ship = {k: "" for k in ship}  # picking up: don't keep an address they may have started typing
             if not name:
                 errors.append("Please enter your name.")
             if "@" not in email:
@@ -459,14 +474,18 @@ def create_app():
                             gifts = [f.get("gift_{}_{}".format(p["id"], i), "").strip() for i in range(l["qty"])] if p["kind"] == "pass" else []
                             con.execute("""INSERT INTO shop_order_lines(order_id, product_id, kind, name, unit_price, qty, fulfillment, taxable, gift_for)
                                            VALUES (?,?,?,?,?,?,?,?,?)""", (oid, p["id"], p["kind"], p["name"], p["price"], l["qty"],
-                                                                         p["fulfillment"], p["taxable"], json.dumps(gifts)))
+                                                                         how_for(p, how), p["taxable"], json.dumps(gifts)))
                         con.execute("COMMIT")
                         return redirect(url_for("pay", code=code))
                 except Exception:
                     con.execute("ROLLBACK")
                     raise
-        t = totals(lines, f.get("ship_state", ""))
-        return render_template("checkout.html", lines=lines, t=t, errors=errors, f=f, terms=terms_for(lines, s).split("\n\n"))
+        state = f.get("ship_state", "")
+        t = totals(lines, state, f.get("how", ""))
+        both_ways = {h: totals(lines, state, h) for h in ("ship", "pickup")} if t["choice"] else {}
+        choosers = [l["product"]["name"] for l in lines if l["product"]["fulfillment"] == "both"]
+        return render_template("checkout.html", lines=lines, t=t, both_ways=both_ways, choosers=choosers, errors=errors, f=f,
+                               terms=terms_for(lines, s).split("\n\n"))
 
     def terms_for(lines, s):
         parts = [s["terms"]]
@@ -745,7 +764,8 @@ def create_app():
                 "kind": kind, "name": name, "description": f.get("description", "").strip(), "price": price or 0,
                 "value_price": num("value_price"), "stock_limit": num("stock_limit", int), "per_order_limit": num("per_order_limit", int),
                 "hidden": 1 if f.get("hidden") else 0, "page_id": f.get("page_id", type=int) or None,
-                "fulfillment": "pass" if kind == "pass" else (f.get("fulfillment") if f.get("fulfillment") in ("pickup", "ship", "none") else "pickup"),
+                "fulfillment": "pass" if kind == "pass" else {(True, True): "both", (True, False): "ship", (False, True): "pickup",
+                                                              (False, False): "none"}[(bool(f.get("can_ship")), bool(f.get("can_pickup")))],
                 "taxable": 1 if f.get("taxable") else 0, "season_label": f.get("season_label", "").strip(),
                 "valid_until": f.get("valid_until", "").strip(), "terms": f.get("terms", "").strip(),
                 "sort": num("sort", int) or 0,

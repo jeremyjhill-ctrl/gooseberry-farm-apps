@@ -9,7 +9,7 @@
   <tr><th>Name</th><th>Where</th><th class="num">Price</th><th class="num">Sold</th><th>Status</th><th></th></tr>
   {% for p in items %}
   <tr>
-    <td><a href="{{ url_for('admin_product', pid=p.id) }}"><b>{{ p.name }}</b></a><div class="muted">{% if p.kind == 'pass' %}Pass: {% for c in p.credits %}{{ c.qty }} × {{ c.name }}{{ ', ' if not loop.last }}{% endfor %}{% else %}{{ {'ship': 'Ships', 'pickup': 'Pick up', 'none': 'Nothing to hand over'}.get(p.fulfillment, '') }}{% endif %}</div></td>
+    <td><a href="{{ url_for('admin_product', pid=p.id) }}"><b>{{ p.name }}</b></a><div class="muted">{% if p.kind == 'pass' %}Pass: {% for c in p.credits %}{{ c.qty }} × {{ c.name }}{{ ', ' if not loop.last }}{% endfor %}{% else %}{{ {'ship': 'Ships', 'pickup': 'Pick up', 'both': 'Ships or pick up', 'none': 'Electronic delivery'}.get(p.fulfillment, '') }}{% endif %}</div></td>
     <td>{{ pages[p.page_id].title if p.page_id in pages else 'Main shop' }}</td>
     <td class="num">{{ money(p.price) }}</td>
     <td class="num">{{ p.sold }}{% if p.stock_limit %} of {{ p.stock_limit }}{% endif %}</td>

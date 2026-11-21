@@ -15,6 +15,7 @@
       {% elif p.left == 0 %}<span class="tag red">Sold out</span>
       {% elif p.left is not none and p.left <= 10 %}<span class="tag amber">Only {{ p.left }} left</span>{% endif %}
       {% if p.kind == 'pass' and p.season_label %}<span class="tag">{{ p.season_label }}</span>{% endif %}
+      {% if p.kind == 'pass' or p.fulfillment == 'none' %}<span class="tag">Electronic delivery</span>{% endif %}
     </div>
   </div>
 </a>

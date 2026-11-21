@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS shop_products (
   per_order_limit INTEGER,
   hidden INTEGER DEFAULT 0,
   page_id INTEGER,                     -- sale page it belongs to (blank = the main shop)
-  fulfillment TEXT DEFAULT 'pickup',   -- items: 'pickup' | 'ship' | 'none', passes: 'pass'
+  fulfillment TEXT DEFAULT 'pickup',   -- items: 'pickup' | 'ship' | 'both' (buyer chooses) | 'none', passes: 'pass'
   taxable INTEGER DEFAULT 1,
   season_label TEXT DEFAULT '',        -- passes: "Good during the 2027 season"
   valid_until TEXT DEFAULT '',         -- passes: last day credits work (YYYY-MM-DD)

@@ -14,9 +14,12 @@
       <ul class="includes" style="margin-top:6px">{% for c in p.credits %}<li>{{ c.qty }} × {{ c.name }}{% if not c.available %} <span class="muted">({{ c.unavailable_note or 'not available right now' }})</span>{% endif %}</li>{% endfor %}</ul></div>
     {% endif %}
     {% for para in (p.description or '').split('\n\n') if para %}<p style="margin:0">{{ para }}</p>{% endfor %}
-    {% if p.kind == 'pass' %}<p class="muted" style="margin:0">{{ p.season_label }}{% if p.valid_until %} · credits work through {{ nice_day(p.valid_until) }}{% endif %}. You'll get a pass with a QR code by email: show it at the farm, and use its code to book playdates online.</p>
+    {% if p.kind == 'pass' %}<p class="muted" style="margin:0">{{ p.season_label }}{% if p.valid_until %} · credits work through {{ nice_day(p.valid_until) }}{% endif %}.</p>
+    <p class="muted" style="margin:0"><b>Electronic delivery.</b> Your pass is emailed right after you pay, with a QR code to show at the farm and a code to book playdates online. Buying it as a gift? Add their name at checkout and you'll get a printable gift certificate too.</p>
     {% elif p.fulfillment == 'ship' %}<p class="muted" style="margin:0">Ships to you. Flat shipping {{ money(SS.shipping_flat) }} per order.</p>
-    {% elif p.fulfillment == 'pickup' %}<p class="muted" style="margin:0">Pick up at the farm.</p>{% endif %}
+    {% elif p.fulfillment == 'pickup' %}<p class="muted" style="margin:0">Pick up at the farm.</p>
+    {% elif p.fulfillment == 'none' %}<p class="muted" style="margin:0"><b>Electronic delivery.</b> Nothing to ship or pick up: the details come in your order email.</p>
+    {% elif p.fulfillment == 'both' %}<p class="muted" style="margin:0">We can ship it to you (flat shipping {{ money(SS.shipping_flat) }} per order), or pick it up at the farm for free. You choose at checkout.</p>{% endif %}
     {% if p.buyable %}
     <form method="post" action="{{ url_for('cart_add') }}" class="row">
       <input type="hidden" name="product_id" value="{{ p.id }}">

@@ -20,7 +20,8 @@
   <noscript><button class="btn ghost">Update</button></noscript>
   <div class="sum">
     <div><span>Subtotal</span><span>{{ money(t.sub) }}</span></div>
-    {% if t.ships %}<div><span>Shipping</span><span>{{ money(t.shipping) }}</span></div>{% endif %}
+    {% if t.ships %}<div><span>Shipping</span><span>{{ money(t.shipping) }}</span></div>
+    {% elif t.choice %}<div class="muted"><span>Shipping {{ money(t.flat) }}, or free if you pick it up at the farm (you choose at checkout)</span><span></span></div>{% endif %}
     <div class="muted"><span>Sales tax is added at checkout</span><span></span></div>
   </div>
 </form>

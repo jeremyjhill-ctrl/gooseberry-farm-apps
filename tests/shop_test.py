@@ -129,7 +129,7 @@ check("bundle credits saved", sorted((x["credit_type_id"], x["qty"]) for x in q(
 check("photo saved", bool(bundle["photo"]) and guest.get("/shop/photos/" + bundle["photo"]).status_code == 200, bundle["photo"])
 r = c.post("/shop/admin/products/new?kind=pass", data={"name": "Empty pass", "price": "10"})
 check("pass without credits refused", r.status_code == 200 and "at least one credit" in body(r))
-c.post("/shop/admin/products/new?kind=item", data={"name": "The Preserver's Garden", "price": "30", "fulfillment": "ship", "taxable": "on", "hidden": "on"})
+c.post("/shop/admin/products/new?kind=item", data={"name": "The Preserver's Garden", "price": "30", "can_ship": "1", "taxable": "on", "hidden": "on"})
 book = q("SELECT * FROM shop_products WHERE name LIKE 'The Preserver%'")[0]
 check("new products start hidden", book["hidden"] == 1)
 r = guest.get("/shop/p/{}".format(book["id"]))
@@ -180,6 +180,43 @@ guest2 = Client(wsgi.application)
 guest2.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 5})
 r = guest2.get("/shop/cart")
 check("cart capped at what's left", 'value="2" selected' in body(r), re.findall(r'value="\d+" selected', body(r)))
+
+# ---------------------------------------------------------------- an item the buyer can have shipped or pick up
+check("bundle page says electronic delivery", "Electronic delivery" in body(guest.get("/shop/p/{}".format(bundle["id"]))))
+c.post("/shop/admin/products/new?kind=item", data={"name": "Signed copy", "price": "35", "can_ship": "1", "can_pickup": "1", "taxable": "on"})
+signed = q("SELECT * FROM shop_products WHERE name='Signed copy'")[0]
+check("ship + pick up boxes save as 'both'", signed["fulfillment"] == "both", signed["fulfillment"])
+r = c.get("/shop/admin/products/{}".format(signed["id"]))
+check("edit form shows both boxes ticked", body(r).count("checked>") >= 2 and 'name="can_ship" value="1" checked' in body(r)
+      and 'name="can_pickup" value="1" checked' in body(r))
+check("products list says ships or pick up", "Ships or pick up" in body(c.get("/shop/admin/products")))
+check("product page offers both", "pick it up at the farm for free" in body(guest.get("/shop/p/{}".format(signed["id"]))))
+g3 = Client(wsgi.application)
+g3.post("/shop/cart/add", data={"product_id": signed["id"], "qty": 1})
+check("cart explains the choice", "or free if you pick it up" in body(g3.get("/shop/cart")))
+r = g3.get("/shop/checkout")
+check("checkout asks ship or pick up", 'name="how" value="ship"' in body(r) and 'name="how" value="pickup"' in body(r) and 'id="shipto"' in body(r))
+r = g3.post("/shop/checkout", data={"name": "Pat Pickup", "email": "pat@example.com", "agree": "on"})
+check("the choice is required", "shipped or pick it up" in body(r))
+r = g3.post("/shop/checkout", data={"name": "Pat Pickup", "email": "pat@example.com", "agree": "on", "how": "pickup", "ship_line1": "half typed"})
+check("pickup order needs no address", "/shop/pay/" in loc(r), body(r)[:300])
+po = q("SELECT * FROM shop_orders WHERE code=?", loc(r).rstrip("/").split("/")[-1])[0]
+check("pickup: no shipping, Missouri tax, no address kept", po["shipping"] == 0 and po["tax"] == round(35 * rate / 100, 2) and not po["ship_line1"], po)
+check("pickup: line marked pick up", q("SELECT fulfillment FROM shop_order_lines WHERE order_id=?", po["id"])[0]["fulfillment"] == "pickup")
+g3.post("/shop/pay/" + po["code"], data={"card": "4242 4242 4242 4242"})
+g4 = Client(wsgi.application)
+g4.post("/shop/cart/add", data={"product_id": signed["id"], "qty": 1})
+r = g4.post("/shop/checkout", data={"name": "Sam Ship", "email": "sam@example.com", "agree": "on", "how": "ship"})
+check("ship choice needs the address", "shipping address" in body(r) and 'value="ship" required checked' in body(r))
+r = g4.post("/shop/checkout", data={"name": "Sam Ship", "email": "sam@example.com", "agree": "on", "how": "ship",
+                                    "ship_line1": "2 Elm", "ship_city": "Tulsa", "ship_state": "OK", "ship_zip": "74101"})
+so = q("SELECT * FROM shop_orders WHERE code=?", loc(r).rstrip("/").split("/")[-1])[0]
+check("ship: flat shipping, no tax out of state", so["shipping"] == 6 and so["tax"] == 0 and so["ship_state"] == "OK", so)
+check("ship: line marked ship", q("SELECT fulfillment FROM shop_order_lines WHERE order_id=?", so["id"])[0]["fulfillment"] == "ship")
+g4.post("/shop/pay/" + so["code"], data={"card": "4242 4242 4242 4242"})
+c.post("/shop/admin/products/new?kind=item", data={"name": "Farm sponsorship", "price": "25"})
+spon = q("SELECT * FROM shop_products WHERE name='Farm sponsorship'")[0]
+check("no boxes = electronic delivery", spon["fulfillment"] == "none" and "Electronic delivery" in body(guest.get("/shop/p/{}".format(spon["id"]))))
 
 # ---------------------------------------------------------------- the pass books a playdate online (7 people)
 b1 = hold(guest, 7)
