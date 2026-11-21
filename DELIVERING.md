@@ -29,3 +29,9 @@ syntax or scrypt (passwords use pbkdf2:sha256).
 Every page shows "Build 1a2b3c4" at the bottom (farm pages, the shop, and Mollie's admin only; her customer
 page stays plain). On Render it's the deployed commit (RENDER_GIT_COMMIT); on the Mac, Publish Farm Apps writes the
 published commit to a BUILD file. When delivering, tell Jeremy "build <short commit> is in _pending".
+
+## Before delivering, also
+- `python tests/layout_check.py` (Chrome + playwright): no stretched round buttons/checkboxes or spilling labels on
+  any admin page at 1300 / 820 / 390 px wide.
+- `gunicorn.conf.py` sets keepalive = 130 (longer than Render's ~120 s connection reuse). Without it, form saves
+  were sometimes lost before reaching the app (Safari showed "server unexpectedly dropped the connection").

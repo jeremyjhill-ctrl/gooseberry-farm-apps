@@ -174,7 +174,8 @@ input[type=datetime-local]{height:46px;border:1px solid #C9CEC0;border-radius:10
 [hidden]{display:none!important}
 label,.grid>*{min-width:0}
 input,select,textarea{max-width:100%;min-width:0}
-.grid input,.grid select{width:100%}
+.grid input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),.grid select{width:100%}  /* text boxes fill the column; round buttons and checkboxes keep their size */
+.switch{flex-wrap:wrap}.switch label{flex:0 0 auto}
 .credit .left{white-space:nowrap}
 .sum div span:last-child{white-space:nowrap;padding-left:8px}
 label.inline>span{flex:1 1 auto;min-width:8em}
