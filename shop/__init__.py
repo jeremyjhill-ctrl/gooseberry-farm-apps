@@ -20,6 +20,7 @@ Settings (environment variables):
 import base64
 import csv
 import datetime as dt
+import hashlib
 import io
 import json
 import os
@@ -51,6 +52,8 @@ TEST_CARD_OK = "4242424242424242"
 TEST_CARD_DECLINE = "4000000000000002"
 HOLD_MINUTES = 30
 MAX_PENDING_PER_VISITOR = 3
+MAX_QUESTIONS = 3      # questions for the buyer per product (e.g. how to inscribe a book)
+MAX_ANSWER = 500       # characters per answer
 
 DEFAULT_SETTINGS = {
     "shop_name": "Gooseberry Bridge Farm Shop",
@@ -254,19 +257,56 @@ def create_app():
         out = [decorate(p) for p in rows(q, *([page_id] if page_id else []))]
         return [p for p in out if include_upcoming or p["state"] in ("open", "ended")]
 
+    CART_KEY = re.compile(r"^\d+(:[0-9a-f]{8})?$")  # "12", or "12:1a2b3c4d" when the buyer answered the item's questions
+
     def cart():
         c = session.get("cart") or {}
-        return {str(k): int(v) for k, v in c.items() if int(v) > 0}
+        return {str(k): int(v) for k, v in c.items() if CART_KEY.match(str(k)) and int(v) > 0}
+
+    def cart_answers():
+        return session.get("cart_answers") or {}
+
+    def pid_of(key):
+        return int(str(key).split(":")[0])
 
     def cart_lines():
         lines = []
-        for pid, qty in cart().items():
-            p = row("SELECT * FROM shop_products WHERE id=?", int(pid))
+        answers = cart_answers()
+        for key, qty in cart().items():
+            p = row("SELECT * FROM shop_products WHERE id=?", pid_of(key))
             if not p:
                 continue
             p = decorate(p)
-            lines.append({"product": p, "qty": qty, "amount": round(float(p["price"]) * qty, 2)})
+            lines.append({"key": key, "product": p, "qty": qty, "amount": round(float(p["price"]) * qty, 2),
+                          "answers": answers.get(key, [])})
         return lines
+
+    def questions(p):
+        """The product's questions for the buyer: [{label, long, required}], at most 3."""
+        try:
+            got = json.loads((p.get("custom_fields") if hasattr(p, "get") else "") or "[]")
+            return [{"label": str(x.get("label", ""))[:200], "long": bool(x.get("long")), "required": bool(x.get("required"))}
+                    for x in got if str(x.get("label", "")).strip()][:MAX_QUESTIONS]
+        except (ValueError, TypeError, AttributeError):
+            return []
+
+    def questions_from_form(f):
+        qs = []
+        for i in range(MAX_QUESTIONS):
+            label = f.get("q_label_{}".format(i), "").strip()[:200]
+            if label:
+                qs.append({"label": label, "long": f.get("q_long_{}".format(i)) == "1", "required": bool(f.get("q_req_{}".format(i)))})
+        return json.dumps(qs) if qs else ""
+
+    def answers_of(l):
+        """A cart line's or order line's answers: [{q, a}]."""
+        a = l.get("answers") if hasattr(l, "get") else None
+        if isinstance(a, list):
+            return a
+        try:
+            return json.loads(a or "[]")
+        except (ValueError, TypeError):
+            return []
 
     def how_for(p, how):
         """How this item gets to the buyer: items that can be shipped or picked up follow the buyer's choice."""
@@ -357,6 +397,7 @@ def create_app():
     app.jinja_env.filters["plain"] = plain
     app.jinja_env.globals.update(money=money, nice_day=fp.nice_day, nice_when=nice_when, pretty_code=fp.pretty_code,
                                  booking_url=booking_url, is_admin=is_admin, photo_view=photo_view,
+                                 questions=questions, answers_of=answers_of,
                                  build_footer=farm_build.footer)
 
     @app.context_processor
@@ -424,25 +465,47 @@ def create_app():
         if not p["buyable"]:
             flash("Sorry, {} isn't available right now.".format(p["name"]))
             return redirect(url_for("product", pid=pid))
+        answers, missing = [], []
+        for i, q in enumerate(questions(p)):
+            a = request.form.get("answer_{}".format(i), "").strip()[:MAX_ANSWER]
+            if q["required"] and not a:
+                missing.append(q["label"])
+            if a:
+                answers.append({"q": q["label"], "a": a})
+        if missing:
+            flash("Please answer: {}".format("; ".join(missing)))
+            return redirect(url_for("product", pid=pid))
+        # The same item with different answers (say, two books inscribed differently) is its own cart line.
+        key = str(pid) if not answers else "{}:{}".format(
+            pid, hashlib.sha1(json.dumps(answers, sort_keys=True).encode()).hexdigest()[:8])
         c = cart()
-        want = c.get(str(pid), 0) + qty
+        others = sum(n for k, n in c.items() if pid_of(k) == pid and k != key)
+        want = c.get(key, 0) + qty
         if p["per_order_limit"]:
-            want = min(want, int(p["per_order_limit"]))
+            want = min(want, int(p["per_order_limit"]) - others)
         if p["left"] is not None:
-            want = min(want, p["left"])
-        c[str(pid)] = want
+            want = min(want, p["left"] - others)
+        if want <= 0:
+            flash("You already have as many {} in your cart as you can buy.".format(p["name"]))
+            return redirect(url_for("cart_view"))
+        c[key] = want
         session["cart"] = c
+        if answers:
+            saved = cart_answers()
+            saved[key] = answers
+            session["cart_answers"] = saved
         flash("Added {} to your cart.".format(p["name"]))
         return redirect(url_for("cart_view"))
 
     @app.post("/cart/update")
     def cart_update():
         c = cart()
-        for pid in list(c):
-            v = request.form.get("qty_" + pid, type=int)
+        for key in list(c):
+            v = request.form.get("qty_" + key, type=int)
             if v is not None:
-                c[pid] = max(0, min(20, v))
+                c[key] = max(0, min(20, v))
         session["cart"] = {k: v for k, v in c.items() if v > 0}
+        session["cart_answers"] = {k: v for k, v in cart_answers().items() if k in session["cart"]}
         return redirect(url_for("cart_view"))
 
     @app.get("/cart")
@@ -484,11 +547,16 @@ def create_app():
                                           (ip, now().isoformat())).fetchone()[0]
                     if pending >= MAX_PENDING_PER_VISITOR:
                         errors.append("You have several checkouts open. Please finish one or wait a few minutes.")
+                    wanted = {}
                     for l in lines:
-                        p = decorate(row("SELECT * FROM shop_products WHERE id=?", l["product"]["id"]))
-                        if not p["buyable"] or (p["left"] is not None and p["left"] < l["qty"]):
+                        wanted[l["product"]["id"]] = wanted.get(l["product"]["id"], 0) + l["qty"]
+                    for pid, n in wanted.items():
+                        p = decorate(row("SELECT * FROM shop_products WHERE id=?", pid))
+                        if not p["buyable"] or (p["left"] is not None and p["left"] < n):
                             errors.append("Sorry, {} just sold out or isn't on sale anymore.".format(p["name"]) if p["left"] == 0 or not p["buyable"]
                                           else "Only {} {} left.".format(p["left"], p["name"]))
+                        elif p["per_order_limit"] and n > int(p["per_order_limit"]):
+                            errors.append("You can buy up to {} {} per order.".format(p["per_order_limit"], p["name"]))
                     if errors:
                         con.execute("ROLLBACK")
                     else:
@@ -504,10 +572,11 @@ def create_app():
                         oid = cur.lastrowid
                         for l in lines:
                             p = l["product"]
-                            gifts = [f.get("gift_{}_{}".format(p["id"], i), "").strip() for i in range(l["qty"])] if p["kind"] == "pass" else []
-                            con.execute("""INSERT INTO shop_order_lines(order_id, product_id, kind, name, unit_price, qty, fulfillment, taxable, gift_for)
-                                           VALUES (?,?,?,?,?,?,?,?,?)""", (oid, p["id"], p["kind"], p["name"], p["price"], l["qty"],
-                                                                         how_for(p, how), p["taxable"], json.dumps(gifts)))
+                            gifts = [f.get("gift_{}_{}".format(l["key"], i), "").strip() for i in range(l["qty"])] if p["kind"] == "pass" else []
+                            con.execute("""INSERT INTO shop_order_lines(order_id, product_id, kind, name, unit_price, qty, fulfillment, taxable, gift_for,
+                                           answers) VALUES (?,?,?,?,?,?,?,?,?,?)""", (oid, p["id"], p["kind"], p["name"], p["price"], l["qty"],
+                                                                         how_for(p, how), p["taxable"], json.dumps(gifts),
+                                                                         json.dumps(l["answers"]) if l["answers"] else ""))
                         con.execute("COMMIT")
                         return redirect(url_for("pay", code=code))
                 except Exception:
@@ -594,6 +663,8 @@ def create_app():
         lines = ["Hi {}! Thank you for your order.".format(o["name"]), ""]
         for l in o["lines"]:
             lines.append("{} × {}  {}".format(l["qty"], l["name"], money(l["unit_price"] * l["qty"])))
+            for a in answers_of(l):
+                lines.append("    {}: {}".format(a["q"], a["a"]))
         lines.append("Total paid: {}".format(money(o["total"])))
         if o["passes"]:
             lines += ["", "Your pass{}: each one has a QR code to show at the farm.".format("es" if len(o["passes"]) > 1 else "")]
@@ -801,7 +872,7 @@ def create_app():
                                                               (False, False): "none"}[(bool(f.get("can_ship")), bool(f.get("can_pickup")))],
                 "taxable": 1 if f.get("taxable") else 0, "season_label": f.get("season_label", "").strip(),
                 "valid_until": f.get("valid_until", "").strip(), "terms": f.get("terms", "").strip(),
-                "sort": num("sort", int) or 0, "photo_view": photo_view_from_form(f),
+                "sort": num("sort", int) or 0, "photo_view": photo_view_from_form(f), "custom_fields": questions_from_form(f),
             }
             if f.get("photo_data", "").startswith("data:"):
                 saved = save_photo(f["photo_data"])
@@ -1008,13 +1079,15 @@ def create_app():
     def admin_orders_csv():
         out = io.StringIO()
         w = csv.writer(out)
-        w.writerow(["Order", "Paid", "Name", "Email", "Phone", "Item", "Qty", "Each", "Fulfillment", "Ship to", "Order subtotal", "Shipping", "Tax", "Total", "Done"])
+        w.writerow(["Order", "Paid", "Name", "Email", "Phone", "Item", "Qty", "Each", "Buyer's answers", "Fulfillment", "Ship to",
+                    "Order subtotal", "Shipping", "Tax", "Total", "Done"])
         for o in rows("SELECT * FROM shop_orders WHERE status='paid' ORDER BY id"):
             ship_to = ", ".join(x for x in [o["ship_name"], o["ship_line1"], o["ship_line2"], o["ship_city"], o["ship_state"], o["ship_zip"]] if x) \
                 if o["ship_line1"] else ""
             for l in rows("SELECT * FROM shop_order_lines WHERE order_id=?", o["id"]):
                 w.writerow([fp.pretty_code(o["code"]), (o["paid_at"] or "")[:16].replace("T", " "), o["name"], o["email"], o["phone"],
-                            l["name"], l["qty"], l["unit_price"], l["fulfillment"], ship_to, o["subtotal"], o["shipping"], o["tax"],
+                            l["name"], l["qty"], l["unit_price"], " | ".join("{}: {}".format(a["q"], a["a"]) for a in answers_of(l)),
+                            l["fulfillment"], ship_to, o["subtotal"], o["shipping"], o["tax"],
                             o["total"], "yes" if o["fulfilled_at"] else ""])
         return Response(out.getvalue(), mimetype="text/csv", headers={"Content-Disposition": 'attachment; filename="farm shop orders.csv"'})
 

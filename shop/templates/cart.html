@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Your cart{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
-{% block body %}
+{% block body %}{% from '_answers.html' import show_answers %}
 <h1>Your cart</h1>
 {% if not lines %}
 <section class="card"><p style="margin:0">Your cart is empty.</p><a class="btn" href="{{ url_for('home') }}">Go shopping</a></section>
@@ -9,9 +9,9 @@
 <form method="post" action="{{ url_for('cart_update') }}" class="card">
   {% for l in lines %}
   <div class="row between" style="border-bottom:1px solid #EEEFE8;padding-bottom:10px">
-    <div><b>{{ l.product.name }}</b><div class="muted">{{ money(l.product.price) }} each{% if not l.product.buyable %} · <span style="color:var(--red)">not available right now</span>{% endif %}</div></div>
+    <div><b>{{ l.product.name }}</b><div class="muted">{{ money(l.product.price) }} each{% if not l.product.buyable %} · <span style="color:var(--red)">not available right now</span>{% endif %}</div>{{ show_answers(l) }}</div>
     <div class="row" style="gap:8px">
-      <select name="qty_{{ l.product.id }}" onchange="this.form.submit()" aria-label="How many {{ l.product.name }}">
+      <select name="qty_{{ l.key }}" onchange="this.form.submit()" aria-label="How many {{ l.product.name }}">
         {% for n in range(0, 11) %}<option value="{{ n }}" {{ 'selected' if n == l.qty }}>{{ 'Remove' if n == 0 else n }}</option>{% endfor %}</select>
       <b style="min-width:70px;text-align:right">{{ money(l.amount) }}</b>
     </div>

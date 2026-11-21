@@ -214,6 +214,49 @@ so = q("SELECT * FROM shop_orders WHERE code=?", loc(r).rstrip("/").split("/")[-
 check("ship: flat shipping, no tax out of state", so["shipping"] == 6 and so["tax"] == 0 and so["ship_state"] == "OK", so)
 check("ship: line marked ship", q("SELECT fulfillment FROM shop_order_lines WHERE order_id=?", so["id"])[0]["fulfillment"] == "ship")
 g4.post("/shop/pay/" + so["code"], data={"card": "4242 4242 4242 4242"})
+# ---------------------------------------------------------------- questions for the buyer (e.g. how to inscribe a book)
+c.post("/shop/admin/products/new?kind=item", data={"name": "Inscribed book", "price": "30", "can_pickup": "1", "per_order_limit": "3",
+       "q_label_0": "How would you like it inscribed?", "q_long_0": "1", "q_req_0": "1",
+       "q_label_1": "Anything else we should know?", "q_long_1": "0", "q_label_2": ""}, content_type="multipart/form-data")
+ib = q("SELECT * FROM shop_products WHERE name='Inscribed book'")[0]
+qs = json.loads(ib["custom_fields"])
+check("questions save", [x["label"] for x in qs] == ["How would you like it inscribed?", "Anything else we should know?"]
+      and qs[0]["long"] and qs[0]["required"] and not qs[1]["long"] and not qs[1]["required"], qs)
+h = body(c.get("/shop/admin/products/{}".format(ib["id"])))
+check("product form shows the saved questions", 'value="How would you like it inscribed?"' in h and 'name="q_label_2"' in h)
+h = body(guest.get("/shop/p/{}".format(ib["id"])))
+check("product page asks the questions", "How would you like it inscribed?" in h and '<textarea name="answer_0" rows="3" maxlength="500" required>' in h
+      and "<span>Anything else we should know? <span class=\"muted\"" in h)
+g5 = Client(wsgi.application)
+r = g5.post("/shop/cart/add", data={"product_id": ib["id"], "qty": 1, "answer_0": "  "})
+check("a required answer can't be skipped", "/shop/p/{}".format(ib["id"]) in loc(r) and not q("SELECT 1 AS x FROM shop_order_lines WHERE name='Inscribed book'"))
+g5.post("/shop/cart/add", data={"product_id": ib["id"], "qty": 1, "answer_0": "To Sam,\nHappy canning! - Jeremy"})
+g5.post("/shop/cart/add", data={"product_id": ib["id"], "qty": 2, "answer_0": "To Pat", "answer_1": "It's a gift"})
+h = body(g5.get("/shop/cart"))
+check("different answers are separate cart lines", h.count('name="qty_{}:'.format(ib["id"])) == 2 and "Happy canning!" in h and "To Pat" in h and "It&#39;s a gift" in h)
+r = g5.post("/shop/cart/add", data={"product_id": ib["id"], "qty": 1, "answer_0": "To Lee"})
+check("per-order limit counts every line of the item", "as many Inscribed book" in body(g5.get(loc(r))) and "To Lee" not in body(g5.get("/shop/cart")))
+g5.post("/shop/cart/add", data={"product_id": ib["id"], "qty": 1, "answer_0": "To Pat", "answer_1": "It's a gift"})
+check("same answers add to the same line", body(g5.get("/shop/cart")).count("To Pat") == 1)
+r = g5.post("/shop/checkout", data={"name": "Ann Answers", "email": "ann@example.com", "agree": "on"})
+oc = loc(r).rstrip("/").split("/")[-1]
+ol = q("SELECT l.* FROM shop_order_lines l JOIN shop_orders o ON o.id=l.order_id WHERE o.code=? ORDER BY l.id", oc)
+by_qty = {x["qty"]: json.loads(x["answers"]) for x in ol}
+check("each line keeps its answers on the order", len(ol) == 2 and [answer["a"] for answer in by_qty.get(1, [])] == ["To Sam,\nHappy canning! - Jeremy"]
+      and by_qty.get(2) == [{"q": "How would you like it inscribed?", "a": "To Pat"}, {"q": "Anything else we should know?", "a": "It's a gift"}], ol)
+g5.post("/shop/pay/" + oc, data={"card": "4242 4242 4242 4242"})
+h = body(g5.get("/shop/order/" + oc))
+check("receipt page shows the answers", "Happy canning!" in h and "To Pat" in h)
+mail = q("SELECT body FROM outbox WHERE recipient='ann@example.com' ORDER BY id DESC")
+check("receipt email shows the answers", mail and "How would you like it inscribed?: To Pat" in mail[0]["body"], mail[:1])
+oid = q("SELECT id FROM shop_orders WHERE code=?", oc)[0]["id"]
+check("admin order page shows the answers", "Happy canning!" in body(c.get("/shop/admin/orders/" + oc)))
+check("orders spreadsheet has the answers", "How would you like it inscribed?: To Pat | Anything else we should know?: It's a gift" in body(c.get("/shop/admin/orders.csv")))
+c.post("/shop/admin/products/{}".format(ib["id"]), data={"name": "Inscribed book", "price": "30", "can_pickup": "1", "q_label_0": ""},
+       content_type="multipart/form-data")
+check("questions can be turned off", q("SELECT custom_fields FROM shop_products WHERE id=?", ib["id"])[0]["custom_fields"] == ""
+      and "answer_0" not in body(guest.get("/shop/p/{}".format(ib["id"]))))
+
 import farm_build
 check("build number at the bottom of shop pages", "Build {}".format(farm_build.build()) in body(guest.get("/shop/")) and "buildtag" in body(c.get("/shop/admin")))
 check("build number at the bottom of playdate pages", "buildtag" in body(Client(wsgi.application).get("/book")) and "buildtag" in body(Client(wsgi.application).get("/account/login")))

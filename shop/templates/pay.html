@@ -7,7 +7,7 @@
   <div class="muted">Gooseberry Bridge Farm</div>
   <div style="font-size:30px;font-weight:700">{{ money(o.total) }}</div>
   <div class="sum" style="font-size:14px">
-    {% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }}</span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
+    {% from '_answers.html' import show_answers %}{% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }}{{ show_answers(l) }}</span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
     {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}
     <div><span>Sales tax</span><span>{{ money(o.tax) }}</span></div>
   </div>

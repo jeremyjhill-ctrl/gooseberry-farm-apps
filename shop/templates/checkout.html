@@ -6,7 +6,8 @@
 {% for e in errors %}<div class="flash" style="border-color:var(--red)">{{ e }}</div>{% endfor %}
 <section class="card sum">
   <h2>Your order</h2>
-  {% for l in lines %}<div><span>{{ l.qty }} × {{ l.product.name }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
+  {% from '_answers.html' import show_answers %}
+  {% for l in lines %}<div><span>{{ l.qty }} × {{ l.product.name }}{{ show_answers(l) }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
   {% macro tail(x) %}
     {% if x.ships %}<div><span>Shipping</span><span>{{ money(x.shipping) }}</span></div>{% endif %}
     <div><span>Sales tax</span><span>{{ money(x.tax) }}</span></div>
@@ -36,7 +37,7 @@
   <p class="muted" style="margin:0">Giving one as a gift? Put their name and it'll show on the pass and the printable certificate. Leave it blank if it's for you.</p>
   {% for l in passes %}{% for i in range(l.qty) %}
   <label>{{ l.product.name }}{% if l.qty > 1 %} #{{ i + 1 }}{% endif %}: a gift for (optional)
-    <input type="text" name="gift_{{ l.product.id }}_{{ i }}" value="{{ f.get('gift_%s_%s'|format(l.product.id, i), '') }}" placeholder="e.g. The Miller family"></label>
+    <input type="text" name="gift_{{ l.key }}_{{ i }}" value="{{ f.get('gift_%s_%s'|format(l.key, i), '') }}" placeholder="e.g. The Miller family"></label>
   {% endfor %}{% endfor %}
   {% endif %}
   {% if t.ships or t.choice %}

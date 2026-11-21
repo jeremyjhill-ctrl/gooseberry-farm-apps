@@ -58,6 +58,23 @@
     <input type="hidden" name="photo_data" id="photo_data">
     {% if p.photo %}<label class="inline"><input type="checkbox" name="remove_photo"> <span>Remove the photo</span></label>{% endif %}
   </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <b style="font-size:14px">Questions for the buyer</b>
+    <div class="muted">Optional. Each question shows a box on the product page above Add to cart, for example
+      <i>How would you like it inscribed?</i> Their answers appear on the order, the receipt email and the orders spreadsheet.</div>
+    {% set qs = questions(p) %}
+    {% for i in range(3) %}{% set q = qs[i] if i < qs|length else {} %}
+    <div class="card" style="padding:12px;gap:8px">
+      <label>Question {{ i + 1 }} <input type="text" name="q_label_{{ i }}" maxlength="200" value="{{ q.label or '' }}"
+        placeholder="{{ 'How would you like it inscribed?' if i == 0 else 'Leave blank for no question' }}"></label>
+      <div class="row">
+        <label class="inline"><input type="radio" name="q_long_{{ i }}" value="0" {{ 'checked' if not q.long }}> <span>One line</span></label>
+        <label class="inline"><input type="radio" name="q_long_{{ i }}" value="1" {{ 'checked' if q.long }}> <span>A bigger box (a few sentences)</span></label>
+        <label class="inline"><input type="checkbox" name="q_req_{{ i }}" value="1" {{ 'checked' if q.required }}> <span>They must answer</span></label>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
   <label>Sale page
     <select name="page_id"><option value="">Main shop page</option>
       {% for pg in pages %}<option value="{{ pg.id }}" {{ 'selected' if p.page_id == pg.id }}>{{ pg.title }}</option>{% endfor %}</select></label>

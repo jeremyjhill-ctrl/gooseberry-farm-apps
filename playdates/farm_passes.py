@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS shop_products (
   description TEXT DEFAULT '',
   photo TEXT DEFAULT '',
   photo_view TEXT DEFAULT '',          -- how the photo sits in its box: fit, position, zoom (see shop photo_view)
+  custom_fields TEXT DEFAULT '',       -- up to 3 questions for the buyer, e.g. how to inscribe a book (JSON)
   price REAL NOT NULL DEFAULT 0,
   value_price REAL,                    -- "a $150 value"
   stock_limit INTEGER,                 -- blank = no limit
@@ -93,7 +94,8 @@ CREATE TABLE IF NOT EXISTS shop_order_lines (
   order_id INTEGER NOT NULL,
   product_id INTEGER,
   kind TEXT, name TEXT, unit_price REAL, qty INTEGER,
-  fulfillment TEXT, taxable INTEGER, gift_for TEXT
+  fulfillment TEXT, taxable INTEGER, gift_for TEXT,
+  answers TEXT DEFAULT ''              -- the buyer's answers to the product's questions (JSON)
 );
 CREATE TABLE IF NOT EXISTS shop_passes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,6 +156,8 @@ def ensure_schema(con):
     """Create the shop tables if they're new, and two starter credit types the first time."""
     con.executescript(SCHEMA)
     add_column(con, "shop_products", "photo_view", "TEXT DEFAULT ''")  # added Nov 20, 2026
+    add_column(con, "shop_products", "custom_fields", "TEXT DEFAULT ''")  # added Nov 20, 2026
+    add_column(con, "shop_order_lines", "answers", "TEXT DEFAULT ''")  # added Nov 20, 2026
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():
         if not con.execute("SELECT 1 FROM shop_credit_types").fetchone():
             for i, (name, value, role, farm) in enumerate(STARTER_TYPES):

@@ -1,0 +1,3 @@
+{% macro show_answers(l) -%}
+{%- for a in answers_of(l) %}<div class="muted answer" style="white-space:pre-wrap;font-size:14px"><b>{{ a.q }}</b> {{ a.a }}</div>{% endfor -%}
+{%- endmacro %}
