@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402  (SQLite file on the Mac, Postgres on Render)
 import farm_auth as fa  # noqa: E402  (personal logins: Mollie gets her own, with only the Bakery box ticked)
+import farm_build  # noqa: E402  (build number, shown at the bottom of Mollie's admin only)
 import mailer  # noqa: E402  (same mail code as Pasture Keeper)
 
 
@@ -348,6 +349,7 @@ def create_app():
         state = reading()
         now = store.now_ms()
         state["demo"] = demo
+        state["build"] = farm_build.build()
         state["stock"] = {i["id"]: store.remaining(state, i, now) for i in state["items"]}
         return jsonify(state)
 

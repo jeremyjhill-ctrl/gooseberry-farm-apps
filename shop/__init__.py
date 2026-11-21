@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "playdates"))
 import dbcompat  # noqa: E402
 import farm_mail  # noqa: E402  (real email only when PLAYDATE_EMAILS=on, like the playdate messages)
 import farm_auth as fa  # noqa: E402  (personal logins)
+import farm_build  # noqa: E402  (the "Build 1a2b3c4" line at the bottom of each page)
 import farm_passes as fp  # noqa: E402
 
 try:
@@ -355,7 +356,8 @@ def create_app():
 
     app.jinja_env.filters["plain"] = plain
     app.jinja_env.globals.update(money=money, nice_day=fp.nice_day, nice_when=nice_when, pretty_code=fp.pretty_code,
-                                 booking_url=booking_url, is_admin=is_admin, photo_view=photo_view)
+                                 booking_url=booking_url, is_admin=is_admin, photo_view=photo_view,
+                                 build_footer=farm_build.footer)
 
     @app.context_processor
     def inject():

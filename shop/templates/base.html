@@ -20,5 +20,6 @@
   {% with msgs = get_flashed_messages() %}{% for m in msgs %}<div class="flash" role="status">{{ m }}</div>{% endfor %}{% endwith %}
   {% block body %}{% endblock %}
 </main>
+{{ build_footer() }}
 </body>
 </html>

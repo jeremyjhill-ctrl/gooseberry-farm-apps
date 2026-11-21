@@ -74,6 +74,7 @@ check("wrong password refused", code == 401)
 code, _ = api("POST", "api/admin/login", {"password": "pie"})
 check("Mollie signs in", code == 200)
 code, st = api("GET", "api/admin/state")
+check("build number in Mollie's admin", bool(st.get("build")), st.get("build"))
 check("admin state", code == 200 and st["settings"]["shopName"] == "Mollie's Farmhouse Bakery")
 
 jpeg = base64.b64encode(b"\xff\xd8\xff\xe0fakejpegbytes\xff\xd9").decode()

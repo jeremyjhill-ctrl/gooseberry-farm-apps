@@ -258,7 +258,7 @@ window.Admin = (function () {
     app().innerHTML = `<div class="admin-top"><div class="wrap"><h1>${h(st.settings.shopName)}</h1>
         <a class="btn ghost small" href="#">View shop</a>${window.DemoBackend ? '' : '<button class="btn link small" data-logout>Sign out</button>'}</div>
         <nav class="tabs">${tabs.map(([k, l]) => `<button class="tab ${tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</nav></div>
-      <main class="wrap admin-main">${st.demo && !window.DemoBackend ? '<div class="banner demo">Demo mode: no Stripe key is set, so orders are marked paid without a payment.</div>' : ''}${body}</main>`;
+      <main class="wrap admin-main">${st.demo && !window.DemoBackend ? '<div class="banner demo">Demo mode: no Stripe key is set, so orders are marked paid without a payment.</div>' : ''}${body}</main>${st.build ? `<p class="muted small" style="text-align:center;padding:20px 0 28px">Build ${h(st.build)}</p>` : ''}`;
   }
 
   // ---------- actions ----------

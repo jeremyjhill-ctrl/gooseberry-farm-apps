@@ -116,6 +116,7 @@ case "$CHOICE" in
     git -C "$WORK" push gh "refs/remotes/delivery/main:refs/heads/main"
     # Bring this folder's code up to date (data/, backups/ and .venv/ are left alone).
     git -C "$WORK" archive refs/remotes/delivery/main | tar -x -C "$HERE"
+    echo "$NEW" > "$HERE/BUILD"   # the build number shown at the bottom of each page when run on this Mac
     mkdir -p "$HERE/_published"
     mv "$BUNDLE" "$HERE/_published/farm-apps-$NEW-$(date +%Y%m%d-%H%M).bundle"
     echo

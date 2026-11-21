@@ -24,3 +24,8 @@ Publish Farm Apps runs every check on Jeremy's Mac, which uses Apple's built-in 
 and only the packages in its .venv (flask 3.1.3, werkzeug 3.1.9, jinja2 3.1.6, qrcode 8.2, ...; no psycopg or gunicorn).
 Run the checks under a Python 3.9 with those packages and `del hashlib.scrypt` first; code must not need newer Python
 syntax or scrypt (passwords use pbkdf2:sha256).
+
+## Build numbers
+Every page shows "Build 1a2b3c4" at the bottom (farm pages, the shop, and Mollie's admin only; her customer
+page stays plain). On Render it's the deployed commit (RENDER_GIT_COMMIT); on the Mac, Publish Farm Apps writes the
+published commit to a BUILD file. When delivering, tell Jeremy "build <short commit> is in _pending".

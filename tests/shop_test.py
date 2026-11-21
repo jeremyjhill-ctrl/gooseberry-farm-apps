@@ -214,6 +214,12 @@ so = q("SELECT * FROM shop_orders WHERE code=?", loc(r).rstrip("/").split("/")[-
 check("ship: flat shipping, no tax out of state", so["shipping"] == 6 and so["tax"] == 0 and so["ship_state"] == "OK", so)
 check("ship: line marked ship", q("SELECT fulfillment FROM shop_order_lines WHERE order_id=?", so["id"])[0]["fulfillment"] == "ship")
 g4.post("/shop/pay/" + so["code"], data={"card": "4242 4242 4242 4242"})
+import farm_build
+check("build number at the bottom of shop pages", "Build {}".format(farm_build.build()) in body(guest.get("/shop/")) and "buildtag" in body(c.get("/shop/admin")))
+check("build number at the bottom of playdate pages", "buildtag" in body(Client(wsgi.application).get("/book")) and "buildtag" in body(Client(wsgi.application).get("/account/login")))
+os.environ["RENDER_GIT_COMMIT"] = "300a131f0e9d8c7b6a5"
+check("on Render it shows the deployed commit", "Build 300a131<" in body(guest.get("/shop/")))
+os.environ.pop("RENDER_GIT_COMMIT")
 import base64 as _b64
 big_photo = "data:image/jpeg;base64," + _b64.b64encode(os.urandom(1200000)).decode()  # a 1.6 MB photo, bigger than the old 500 KB limit
 r = c.post("/shop/admin/products/new?kind=item", data={"name": "Big photo book", "price": "30", "can_ship": "1", "photo_data": big_photo}, content_type="multipart/form-data")

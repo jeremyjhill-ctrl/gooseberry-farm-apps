@@ -6,3 +6,4 @@ __pycache__/
 .DS_Store
 .server-db-url
 _pending/
+BUILD

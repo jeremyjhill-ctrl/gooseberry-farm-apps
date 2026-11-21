@@ -325,7 +325,7 @@ details summary{cursor:pointer;font-weight:700}
 <main>
 {% for m in messages %}<div class="flash {{ 'err' if m.startswith('!') }}" role="status">{{ m.lstrip('!') }}</div>{% endfor %}
 {{ body }}
-</main></body></html>"""
+</main>{{ build }}</body></html>"""
 
 LOGIN = """<form method="post" class="card narrow">
   <h1>Log in</h1>
@@ -438,7 +438,10 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
         body = Markup(render_template_string(body_template, **ctx))
         bar = admin_bar(request, here if title != "Logins" else "logins", url_for("account_logins"), url_for("account_password"),
                         url_for("account_logout"), legacy=legacy_admin()) if farm and (current_user(request) or legacy_admin()) else ""
-        return render_template_string(SHELL, title=title, brand=brand, color=color, body=body, messages=list(messages), bar=bar)
+        import farm_build
+        build = farm_build.footer() if farm else ""  # Mollie's pages stay plain
+        return render_template_string(SHELL, title=title, brand=brand, color=color, body=body, messages=list(messages), bar=bar,
+                                      build=build)
 
     def safe_next(nxt):
         nxt = nxt or ""
@@ -642,5 +645,7 @@ def attach_playdates(pd):
         return bool(session.get("admin")) and not accounts_for("playdates")
 
     add_pages(app, default_next="/admin", legacy_admin=legacy, legacy_login_endpoint="admin_login", here="playdates")
+    import farm_build
+    app.jinja_env.globals["build_footer"] = farm_build.footer
     app.jinja_env.globals["farm_bar"] = lambda: admin_bar(request, "playdates", url_for("account_logins"), url_for("account_password"),
                                                           url_for("account_logout"), legacy=legacy())
