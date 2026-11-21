@@ -17,6 +17,22 @@
   <label>Message while the shop is hidden <textarea name="shop_hidden_message" rows="2">{{ SS.shop_hidden_message }}</textarea></label>
   <button class="btn big">Save</button>
 </form>
+<section class="card" id="payments">
+  <div class="row between"><h2>Card payments</h2>
+    <span class="tag {{ {'live': '', 'test': 'amber', 'off': 'grey'}[stripe_mode] }}">{{ {'live': 'Live', 'test': 'Stripe test mode', 'off': 'Test stand-in'}[stripe_mode] }}</span></div>
+  {% if stripe_mode == 'off' %}
+  <div class="muted">No Stripe key on this server, so checkout uses a pretend card page (4242 4242 4242 4242). No money moves.</div>
+  {% else %}
+  <div class="muted">{% if stripe_mode == 'test' %}Checkout goes to Stripe's payment page in <b>test mode</b>: use card 4242 4242 4242 4242. No money moves.
+    {% else %}Checkout goes to Stripe's payment page and <b>charges real cards</b>. Refunds are done in Stripe.{% endif %}</div>
+  {% if stripe_webhook_set %}<div class="muted">Stripe's payment messages: set up.</div>
+  {% else %}<div class="warn" role="alert"><b>Stripe's payment messages aren't set up yet.</b> Orders still complete when the buyer comes back
+    from Stripe's page, but if they close the tab first the order waits until someone opens it here.</div>{% endif %}
+  <details><summary style="cursor:pointer;font-weight:700">Stripe webhook details</summary>
+    <div class="muted" style="margin-top:8px">Endpoint URL: <span class="code" style="word-break:break-all">{{ webhook_url }}</span><br>
+      Events: {% for e in stripe_events %}<span class="code">{{ e }}</span>{{ ', ' if not loop.last }}{% endfor %}</div></details>
+  {% endif %}
+</section>
 {% set svc = email_service() %}
 <form method="post" action="{{ url_for('admin_settings_email') }}" class="card" id="email">
   <h2>Email</h2>

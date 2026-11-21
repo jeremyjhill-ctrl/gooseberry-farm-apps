@@ -6,6 +6,8 @@
 <section class="card">
   <div class="row between"><h1>{{ o.name }}</h1><span class="tag {{ '' if o.status == 'paid' else 'grey' }}">{{ o.status }}</span></div>
   <div class="muted">Order <span class="code">{{ pretty_code(o.code) }}</span> · {{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }} · {{ o.email }}{% if o.phone %} · {{ o.phone }}{% endif %}</div>
+  {% if o.pay_note %}<div class="warn" role="alert">{{ o.pay_note }}</div>{% endif %}
+  {% if o.status == 'paid' %}<div class="muted">Paid by {{ {'stripe': 'card through Stripe', 'test_card': 'the test card (no real money)', 'free': 'nothing: it was free'}.get(o.method, o.method or '') }}{% if stripe_link %} · <a href="{{ stripe_link }}" target="_blank" rel="noopener">See it in Stripe</a> (refunds are done there){% endif %}</div>{% endif %}
   <div class="sum">
     {% from '_answers.html' import show_answers %}{% for l in o.lines %}<div><span>{{ l.qty }} × {{ l.name }} <span class="muted">({{ {'ship': 'ship', 'pickup': 'pick up', 'pass': 'pass, electronic delivery', 'none': 'electronic delivery'}.get(l.fulfillment, '') }})</span>{{ show_answers(l) }}</span><span>{{ money(l.unit_price * l.qty) }}</span></div>{% endfor %}
     {% if o.shipping %}<div><span>Shipping</span><span>{{ money(o.shipping) }}</span></div>{% endif %}

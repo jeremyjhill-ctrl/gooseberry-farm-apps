@@ -90,7 +90,13 @@ if [ -f "$WORK/tests/email_status_test.py" ] && ! (cd "$WORK" && env -u DATABASE
   cat /tmp/farm-emailstatus.json; tail -20 /tmp/farm-emailstatus.log
   pause; exit 1
 fi
-echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')$([ -f /tmp/farm-logins.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-logins.json"));print(",",d["passed"],"of",d["total"],"logins")' | tr -d '\n')$([ -f /tmp/farm-emailstatus.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-emailstatus.json"));print(",",d["passed"],"of",d["total"],"email status")' | tr -d '\n')."
+rm -f /tmp/farm-stripe.json
+if [ -f "$WORK/tests/stripe_test.py" ] && ! (cd "$WORK" && env -u DATABASE_URL "$HERE/.venv/bin/python" tests/stripe_test.py > /tmp/farm-stripe.json 2>/tmp/farm-stripe.log); then
+  echo "STOPPED: the Stripe payments check failed on this delivery, so nothing was published."
+  cat /tmp/farm-stripe.json; tail -20 /tmp/farm-stripe.log
+  pause; exit 1
+fi
+echo "All checks passed: $(python3 -c 'import json;d=json.load(open("/tmp/farm-safety.json"));print(d["passed"],"of",d["total"])') playdate, $(python3 -c 'import json;d=json.load(open("/tmp/farm-bakery.json"));print(d["passed"],"of",d["total"])') bakery$([ -f /tmp/farm-shop.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-shop.json"));print(",",d["passed"],"of",d["total"],"shop")' | tr -d '\n')$([ -f /tmp/farm-logins.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-logins.json"));print(",",d["passed"],"of",d["total"],"logins")' | tr -d '\n')$([ -f /tmp/farm-emailstatus.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-emailstatus.json"));print(",",d["passed"],"of",d["total"],"email status")' | tr -d '\n')$([ -f /tmp/farm-stripe.json ] && python3 -c 'import json;d=json.load(open("/tmp/farm-stripe.json"));print(",",d["passed"],"of",d["total"],"Stripe")' | tr -d '\n')."
 
 echo
 echo "Checking what's on GitHub now..."

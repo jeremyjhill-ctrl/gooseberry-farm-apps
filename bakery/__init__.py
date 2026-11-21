@@ -237,7 +237,7 @@ def create_app():
                 metadata=meta,
                 payment_intent_data={"description": "{} #{} — {}".format(shop_name, order["number"], order["customer"]["name"]),
                                      "metadata": {"orderId": order["id"], "orderNumber": str(order["number"])}},
-                expires_at=int(store.now_ms() / 1000) + hold * 60,
+                expires_at=int(store.now_ms() / 1000) + max(hold, 31) * 60,  # Stripe refuses anything under 30 minutes
                 success_url=site() + "?order={}&session_id={{CHECKOUT_SESSION_ID}}".format(order["id"]),
                 cancel_url=site() + "?cancelled=" + order["id"],
             )
@@ -263,6 +263,7 @@ def create_app():
         if stripe and o["status"] == "pending" and o.get("stripeSessionId"):
             try:
                 cs = stripe.checkout.Session.retrieve(o["stripeSessionId"], api_key=stripe_key)
+                cs = cs.to_dict() if hasattr(cs, "to_dict") else cs
                 if cs["payment_status"] == "paid":
                     with changing() as state:
                         o = store.mark_paid(state, order_id, {"amountPaid": cs["amount_total"]}, store.now_ms())
@@ -293,6 +294,7 @@ def create_app():
             return "", 400
         try:
             event = stripe.Webhook.construct_event(request.get_data(), request.headers.get("Stripe-Signature", ""), webhook_secret)
+            event = event.to_dict() if hasattr(event, "to_dict") else event  # Stripe's objects don't do .get(); plain dicts do
         except Exception as e:  # noqa: BLE001
             return "Webhook error: {}".format(e), 400
         cs = event["data"]["object"]

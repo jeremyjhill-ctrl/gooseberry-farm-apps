@@ -160,6 +160,12 @@ def ensure_schema(con):
     add_column(con, "shop_products", "custom_fields", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_order_lines", "answers", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_products", "one_of_a_kind", "INTEGER DEFAULT 0")  # added Nov 21, 2026
+    # Stripe Checkout, added Nov 21, 2026: the Checkout Session and payment behind a paid order,
+    # what Stripe actually charged (cents), and a note for Staci when something needs a look.
+    add_column(con, "shop_orders", "stripe_session", "TEXT DEFAULT ''")
+    add_column(con, "shop_orders", "stripe_payment", "TEXT DEFAULT ''")
+    add_column(con, "shop_orders", "amount_paid", "INTEGER")
+    add_column(con, "shop_orders", "pay_note", "TEXT DEFAULT ''")
     import farm_mail
     farm_mail.ensure_schema(con, add_column)  # email status on Admin > Messages (added Nov 21, 2026)
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():

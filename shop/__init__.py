@@ -4,8 +4,8 @@ Runs beside the playdate booking app (see wsgi.py) and shares its database, so a
 here can pay for a playdate booking there (playdates/farm_passes.py holds the shared rules).
 It does not share anything with Mollie's bakery.
 
-Customer pages: shop home, sale pages, product pages, cart, checkout (TEST card stand-in until
-the farm's Stripe account is hooked up), order confirmation, and each pass's own page with a QR.
+Customer pages: shop home, sale pages, product pages, cart, checkout (Stripe Checkout when the farm's
+Stripe key is set, otherwise a TEST card stand-in), order confirmation, and each pass's own page with a QR.
 Admin (/admin, same password as the playdate admin): storefront switches, products and bundles,
 credit types, sale pages, orders, passes and hand-made codes, settings.
 
@@ -15,6 +15,9 @@ Settings (environment variables):
   PLAYDATE_DB           on the Mac: the playdate database file (the shop's tables live in it)
   DATABASE_URL          on Render: the Postgres server (farm_apps database)
   R2_*                  Cloudflare R2 for product photos (same bucket as the bakery, "shop/" folder)
+  FARM_STRIPE_SECRET_KEY      the farm's Stripe secret key (sk_test_... first, sk_live_... for real sales).
+                              Blank = the test card stand-in (how it runs on the Mac).
+  FARM_STRIPE_WEBHOOK_SECRET  from the farm's Stripe webhook for <site>/shop/stripe/webhook (whsec_...)
 """
 import base64
 import csv
@@ -27,6 +30,7 @@ import re
 import secrets
 import sqlite3
 import sys
+import time
 from functools import wraps
 
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request, send_from_directory,
@@ -50,6 +54,9 @@ except ImportError:  # pragma: no cover
 TEST_CARD_OK = "4242424242424242"
 TEST_CARD_DECLINE = "4000000000000002"
 HOLD_MINUTES = 30
+STRIPE_PAGE_MINUTES = 35   # how long Stripe's payment page stays open (Stripe allows 30 minutes to 24 hours)
+STRIPE_GRACE_MINUTES = 10  # items stay held this much longer, so a payment made at the last moment still finds its order
+STRIPE_EVENTS = ("checkout.session.completed", "checkout.session.expired")
 MAX_PENDING_PER_VISITOR = 3
 MAX_QUESTIONS = 3      # questions for the buyer per product (e.g. how to inscribe a book)
 MAX_ANSWER = 500       # characters per answer
@@ -90,6 +97,14 @@ def create_app():
         r2 = boto3.client("s3", endpoint_url=endpoint, region_name="auto",
                           aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
                           aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"])
+
+    stripe_key = os.environ.get("FARM_STRIPE_SECRET_KEY", "").strip()
+    webhook_secret = os.environ.get("FARM_STRIPE_WEBHOOK_SECRET", "").strip()
+    stripe = None
+    if stripe_key:
+        import stripe as stripe_lib  # only needed once real payments are on
+        stripe = stripe_lib
+    stripe_mode = "off" if not stripe_key else ("live" if "_live_" in stripe_key else "test")
 
     app = Flask(__name__, static_folder="static", static_url_path="/static", template_folder="templates")
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -243,7 +258,7 @@ def create_app():
         p["page"] = row("SELECT * FROM shop_pages WHERE id=?", p["page_id"]) if p["page_id"] else None
         p["state"] = page_state(p["page"])
         p["buyable"] = (not p["hidden"] and not p["archived"] and p["state"] == "open" and (p["left"] is None or p["left"] > 0)
-                        and not settings()["shop_hidden"])
+                        and (not settings()["shop_hidden"] or is_admin()))  # staff can test-buy while it's hidden
         return p
 
     def visible_products(page_id=None, include_upcoming=False):
@@ -608,16 +623,166 @@ def create_app():
         o["passes"] = rows("SELECT * FROM shop_passes WHERE order_id=? ORDER BY id", o["id"])
         return o
 
+    # ------------------------------------------------------------ paying
+    def cents(x):
+        return int(round(float(x or 0) * 100))
+
+    def sdict(obj):
+        """Stripe's library hands back its own objects (not dicts, so .get() fails on them); this makes plain dicts."""
+        return obj.to_dict() if hasattr(obj, "to_dict") else obj
+
+    def finish_order(oid, method, payment="", amount=None):
+        """Marks an order paid, makes its passes and emails the receipt: exactly once, however many times it's called
+        (Stripe's message and the buyer's return can arrive together). Returns True only for the call that did it."""
+        con = db()
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            fresh = dict(con.execute("SELECT * FROM shop_orders WHERE id=?", (oid,)).fetchone())
+            if fresh["status"] == "paid":
+                con.execute("ROLLBACK")
+                return False
+            notes = []
+            if method == "test_card" and (fresh["status"] != "pending" or (fresh["hold_expires"] or "") < now().isoformat()):
+                con.execute("ROLLBACK")
+                return False
+            if fresh["status"] != "pending":
+                # Money was taken, so the order stands, but its items may have gone back on sale in the meantime.
+                notes.append("Paid after the checkout hold ran out: check that the items are still in stock.")
+            if amount is not None and int(amount) != cents(fresh["total"]):
+                notes.append("Stripe charged {} but the order total is {}.".format(money(int(amount) / 100.0), money(fresh["total"])))
+            con.execute("""UPDATE shop_orders SET status='paid', paid_at=?, method=?, hold_expires=NULL, stripe_payment=?,
+                           amount_paid=?, pay_note=? WHERE id=?""",
+                        (now().isoformat(), method, payment or "", amount, " ".join(notes), oid))
+            for l in [dict(r) for r in con.execute("SELECT * FROM shop_order_lines WHERE order_id=? ORDER BY id", (oid,))]:
+                if l["kind"] != "pass":
+                    continue
+                p = row("SELECT * FROM shop_products WHERE id=?", l["product_id"]) or {}
+                credit_rows = [(c["credit_type_id"], c["qty"]) for c in rows(
+                    "SELECT credit_type_id, qty FROM shop_product_credits WHERE product_id=? ORDER BY id", l["product_id"])]
+                gifts = json.loads(l["gift_for"] or "[]")
+                for i in range(int(l["qty"])):
+                    fp.create_pass(con, l["name"], credit_rows, holder=fresh["name"], gift_for=(gifts[i] if i < len(gifts) else ""),
+                                   email=fresh["email"], season_label=p.get("season_label", ""), valid_until=p.get("valid_until", ""),
+                                   source="sale", order_id=oid, product_id=l["product_id"], by_whom="shop")
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+        email_order(order_by_code(fresh["code"]))
+        return True
+
+    def settle_with_stripe(o):
+        """Asks Stripe about the order's payment page and finishes the order if it's been paid.
+        Returns Stripe's session (a dict) or None if there isn't one or Stripe couldn't be reached."""
+        sid = o.get("stripe_session") or ""
+        if not stripe or not sid.startswith("cs_") or o["status"] == "paid":
+            return None
+        try:
+            cs = sdict(stripe.checkout.Session.retrieve(sid, api_key=stripe_key))
+        except Exception:  # noqa: BLE001
+            app.logger.exception("Stripe lookup failed for order %s", o["code"])
+            return None
+        if cs.get("payment_status") == "paid":
+            finish_order(o["id"], "stripe", cs.get("payment_intent") or "", cs.get("amount_total"))
+        return cs
+
+    def stripe_lines(o):
+        items = []
+        for l in o["lines"]:
+            product = {"name": l["name"]}
+            said = "; ".join("{}: {}".format(x["q"], x["a"]) for x in answers_of(l))
+            if said:
+                product["description"] = said[:400]
+            items.append({"quantity": int(l["qty"]), "price_data": {"currency": "usd", "unit_amount": cents(l["unit_price"]),
+                                                                    "product_data": product}})
+        if o["shipping"]:
+            items.append({"quantity": 1, "price_data": {"currency": "usd", "unit_amount": cents(o["shipping"]),
+                                                        "product_data": {"name": "Shipping"}}})
+        if o["tax"]:
+            items.append({"quantity": 1, "price_data": {"currency": "usd", "unit_amount": cents(o["tax"]),
+                                                        "product_data": {"name": "Sales tax"}}})
+        if sum(x["quantity"] * x["price_data"]["unit_amount"] for x in items) != cents(o["total"]):
+            # Rounding never should, but if the pieces don't add up exactly, charge the order total as one line.
+            items = [{"quantity": 1, "price_data": {"currency": "usd", "unit_amount": cents(o["total"]),
+                                                    "product_data": {"name": "Order {}".format(fp.pretty_code(o["code"]))}}}]
+        return items
+
+    def pay_with_stripe(o):
+        cs = settle_with_stripe(o)
+        o = order_by_code(o["code"])
+        if o["status"] == "paid":
+            return redirect(url_for("order", code=o["code"]))
+        if cs and cs.get("status") == "open" and cs.get("url"):
+            return redirect(cs["url"])  # their payment page is still open: back to it, never a second one
+        if o["status"] != "pending":
+            return timed_out()
+        if (o.get("stripe_session") or "").startswith("cs_") and cs is None:
+            return could_not_start(o)  # couldn't ask Stripe about their open page: never risk a second one
+        if cents(o["total"]) == 0:
+            finish_order(o["id"], "free")
+            return redirect(url_for("order", code=o["code"]))
+        if cents(o["total"]) < 50:
+            return render_template("message.html", title="That's too small to pay by card",
+                                   body="Card payments need to be at least 50¢. Please add something to your order.",
+                                   link=url_for("cart_view"), link_text="Back to my cart")
+        # Claim the order so two clicks (or two tabs) can't open two payment pages for it. A claim older than
+        # 30 seconds belonged to a request that died part way, so it's fair game.
+        old = o.get("stripe_session") or ""
+        if old.startswith("starting:") and time.time() - float(old.split(":")[1] or 0) < 30:
+            for _ in range(15):  # another click is opening it right now: wait for it, then follow it
+                time.sleep(0.3)
+                sid = (row("SELECT stripe_session FROM shop_orders WHERE id=?", o["id"]) or {}).get("stripe_session") or ""
+                if sid.startswith("cs_"):
+                    return redirect(url_for("pay", code=o["code"]))
+            return could_not_start(o)
+        mine = "starting:{:.3f}".format(time.time())
+        if db().execute("UPDATE shop_orders SET stripe_session=? WHERE id=? AND status='pending' AND COALESCE(stripe_session, '')=?",
+                        (mine, o["id"], old)).rowcount != 1:
+            return redirect(url_for("pay", code=o["code"]))  # someone else just claimed it: start over and follow theirs
+        page_ends = now() + dt.timedelta(minutes=STRIPE_PAGE_MINUTES)
+        try:
+            cs = sdict(stripe.checkout.Session.create(
+                api_key=stripe_key,
+                mode="payment",
+                payment_method_types=["card"],  # cards, Apple Pay and Google Pay: paid on the spot, nothing to wait on
+                customer_email=o["email"],
+                client_reference_id=o["code"],
+                line_items=stripe_lines(o),
+                metadata={"order": o["code"], "app": "farm-shop"},
+                payment_intent_data={"description": "{} order {}: {}".format(settings()["shop_name"], fp.pretty_code(o["code"]), o["name"]),
+                                     "metadata": {"order": o["code"], "app": "farm-shop"}},
+                expires_at=int(page_ends.timestamp()),
+                success_url=url_for("order", code=o["code"], _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+                cancel_url=url_for("pay_cancelled", code=o["code"], _external=True),
+            ))
+        except Exception:  # noqa: BLE001
+            app.logger.exception("Stripe checkout failed for order %s", o["code"])
+            db().execute("UPDATE shop_orders SET stripe_session=? WHERE id=? AND stripe_session=?", (old, o["id"], mine))
+            return could_not_start(o)
+        held = (page_ends + dt.timedelta(minutes=STRIPE_GRACE_MINUTES)).isoformat()
+        db().execute("UPDATE shop_orders SET stripe_session=?, hold_expires=? WHERE id=?", (cs["id"], held, o["id"]))
+        return redirect(cs["url"])
+
+    def timed_out():
+        return render_template("message.html", title="This checkout timed out",
+                               body="We held your items for {} minutes and they've been put back. You weren't charged.".format(HOLD_MINUTES),
+                               link=url_for("cart_view"), link_text="Back to my cart")
+
+    def could_not_start(o):
+        return render_template("message.html", title="We couldn't open the payment page",
+                               body="Nothing was charged. Please try again in a minute.",
+                               link=url_for("pay", code=o["code"]), link_text="Try again")
+
     @app.route("/pay/<code>", methods=["GET", "POST"])
     def pay(code):
-        """TEST STAND-IN FOR STRIPE CHECKOUT (the farm's Stripe account goes here later)."""
+        """Stripe Checkout when the farm's key is set; otherwise the TEST card stand-in."""
         o = order_by_code(code)
         if o["status"] == "paid":
             return redirect(url_for("order", code=o["code"]))
+        if stripe:
+            return pay_with_stripe(o)
         if o["status"] != "pending":
-            return render_template("message.html", title="This checkout timed out",
-                                   body="We held your items for {} minutes and they've been put back. You weren't charged.".format(HOLD_MINUTES),
-                                   link=url_for("cart_view"), link_text="Back to my cart")
+            return timed_out()
         error = None
         if request.method == "POST":
             card = "".join(ch for ch in request.form.get("card", "") if ch.isdigit())
@@ -626,35 +791,46 @@ def create_app():
             elif card != TEST_CARD_OK:
                 error = "Test mode: use card 4242 4242 4242 4242 (any future date, any 3 digits)."
             else:
-                con = db()
-                con.execute("BEGIN IMMEDIATE")
-                try:
-                    fresh = dict(con.execute("SELECT * FROM shop_orders WHERE id=?", (o["id"],)).fetchone())
-                    if fresh["status"] != "pending" or fresh["hold_expires"] < now().isoformat():
-                        con.execute("ROLLBACK")
-                        return redirect(url_for("pay", code=o["code"]))
-                    con.execute("UPDATE shop_orders SET status='paid', paid_at=?, method='test_card', hold_expires=NULL WHERE id=?",
-                                (now().isoformat(), o["id"]))
-                    for l in o["lines"]:
-                        if l["kind"] != "pass":
-                            continue
-                        p = row("SELECT * FROM shop_products WHERE id=?", l["product_id"]) or {}
-                        credit_rows = [(c["credit_type_id"], c["qty"]) for c in rows(
-                            "SELECT credit_type_id, qty FROM shop_product_credits WHERE product_id=? ORDER BY id", l["product_id"])]
-                        gifts = json.loads(l["gift_for"] or "[]")
-                        for i in range(int(l["qty"])):
-                            fp.create_pass(con, l["name"], credit_rows, holder=o["name"], gift_for=(gifts[i] if i < len(gifts) else ""),
-                                           email=o["email"], season_label=p.get("season_label", ""), valid_until=p.get("valid_until", ""),
-                                           source="sale", order_id=o["id"], product_id=l["product_id"], by_whom="shop")
-                    con.execute("COMMIT")
-                except Exception:
-                    con.execute("ROLLBACK")
-                    raise
+                finish_order(o["id"], "test_card")
                 session.pop("cart", None)
-                o = order_by_code(o["code"])
-                email_order(o)
+                session.pop("cart_answers", None)
                 return redirect(url_for("order", code=o["code"]))
         return render_template("pay.html", o=o, error=error)
+
+    @app.get("/pay/<code>/cancelled")
+    def pay_cancelled(code):
+        """The buyer backed out of Stripe's page: close it and put the items back on sale. Their cart is still here."""
+        o = order_by_code(code)
+        if stripe and o["status"] == "pending" and (o.get("stripe_session") or "").startswith("cs_"):
+            try:
+                stripe.checkout.Session.expire(o["stripe_session"], api_key=stripe_key)
+                db().execute("UPDATE shop_orders SET status='cancelled', hold_expires=NULL WHERE id=? AND status='pending'", (o["id"],))
+            except Exception:  # noqa: BLE001  already paid or already closed: ask Stripe which
+                settle_with_stripe(o)
+            if order_by_code(code)["status"] == "paid":
+                return redirect(url_for("order", code=o["code"]))
+        flash("No payment was made. Your cart is just as you left it.")
+        return redirect(url_for("cart_view"))
+
+    @app.post("/stripe/webhook")
+    def stripe_webhook():
+        """Stripe's messages about the farm's payment pages. Set it up in Stripe for the two STRIPE_EVENTS."""
+        if not stripe or not webhook_secret:
+            return "Stripe isn't set up on this server.", 400
+        try:
+            event = sdict(stripe.Webhook.construct_event(request.get_data(), request.headers.get("Stripe-Signature", ""), webhook_secret))
+        except Exception:  # noqa: BLE001  not really from Stripe (or the secret is wrong)
+            return "Signature check failed.", 400
+        cs = (event.get("data") or {}).get("object") or {}
+        code = (cs.get("metadata") or {}).get("order") or cs.get("client_reference_id") or ""
+        o = row("SELECT * FROM shop_orders WHERE code=?", code) if code else None
+        if not o:
+            return {"received": True, "note": "not a farm shop order"}
+        if event.get("type") == "checkout.session.completed" and cs.get("payment_status") == "paid":
+            finish_order(o["id"], "stripe", cs.get("payment_intent") or "", cs.get("amount_total"))
+        elif event.get("type") == "checkout.session.expired" and o["status"] == "pending" and o.get("stripe_session") == cs.get("id"):
+            db().execute("UPDATE shop_orders SET status='expired', hold_expires=NULL WHERE id=? AND status='pending'", (o["id"],))
+        return {"received": True}
 
     def email_order(o):
         s = settings()
@@ -683,7 +859,13 @@ def create_app():
     def order(code):
         o = order_by_code(code)
         if o["status"] != "paid":
+            settle_with_stripe(o)  # back from Stripe's page: don't wait for Stripe's message
+            o = order_by_code(code)
+        if o["status"] != "paid":
             return redirect(url_for("pay", code=o["code"]))
+        if request.args.get("session_id") and request.args.get("session_id") == o.get("stripe_session"):
+            session.pop("cart", None)  # this buyer just paid: empty their cart
+            session.pop("cart_answers", None)
         return render_template("order.html", o=o)
 
     # ------------------------------------------------------------ a pass
@@ -1058,7 +1240,12 @@ def create_app():
     @admin_required
     def admin_order(code):
         o = order_by_code(code)
-        return render_template("admin/order.html", o=o)
+        if o["status"] != "paid" and settle_with_stripe(o):
+            o = order_by_code(code)
+        dash = ""
+        if (o.get("stripe_payment") or "").startswith("pi_"):
+            dash = "https://dashboard.stripe.com/{}payments/{}".format("test/" if stripe_mode == "test" else "", o["stripe_payment"])
+        return render_template("admin/order.html", o=o, stripe_link=dash)
 
     @app.post("/admin/orders/<code>/fulfilled")
     @admin_required
@@ -1165,7 +1352,9 @@ def create_app():
             flash("Shop settings saved.")
             return redirect(url_for("admin_settings"))
         return render_template("admin/settings.html", pd_tax=playdate_settings().get("tax_rate", 6.475),
-                               own_tax=row("SELECT value FROM shop_settings WHERE key='tax_rate'"))
+                               own_tax=row("SELECT value FROM shop_settings WHERE key='tax_rate'"),
+                               stripe_mode=stripe_mode, stripe_webhook_set=bool(webhook_secret), stripe_events=STRIPE_EVENTS,
+                               webhook_url=url_for("stripe_webhook", _external=True))
 
     @app.post("/admin/settings/email")
     @admin_required
