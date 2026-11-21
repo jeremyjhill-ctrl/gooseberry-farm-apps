@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS shop_products (
   photo TEXT DEFAULT '',
   photo_view TEXT DEFAULT '',          -- how the photo sits in its box: fit, position, zoom (see shop photo_view)
   custom_fields TEXT DEFAULT '',       -- up to 3 questions for the buyer, e.g. how to inscribe a book (JSON)
+  one_of_a_kind INTEGER DEFAULT 0,     -- a unique handmade piece: stock 1, tagged "One of a kind" instead of "Only 1 left"
   price REAL NOT NULL DEFAULT 0,
   value_price REAL,                    -- "a $150 value"
   stock_limit INTEGER,                 -- blank = no limit
@@ -158,6 +159,7 @@ def ensure_schema(con):
     add_column(con, "shop_products", "photo_view", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_products", "custom_fields", "TEXT DEFAULT ''")  # added Nov 20, 2026
     add_column(con, "shop_order_lines", "answers", "TEXT DEFAULT ''")  # added Nov 20, 2026
+    add_column(con, "shop_products", "one_of_a_kind", "INTEGER DEFAULT 0")  # added Nov 21, 2026
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():
         if not con.execute("SELECT 1 FROM shop_credit_types").fetchone():
             for i, (name, value, role, farm) in enumerate(STARTER_TYPES):

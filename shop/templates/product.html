@@ -29,16 +29,18 @@
         {% else %}<input type="text" name="answer_{{ loop.index0 }}" maxlength="500" {{ 'required' if q.required }}>{% endif %}</label>
       {% endfor %}
       <div class="row">
-        <label style="flex-direction:row;align-items:center;gap:8px">How many
-          <select name="qty">{% for n in range(1, ([p.left or 10, p.per_order_limit or 10, 10]|min) + 1) %}<option>{{ n }}</option>{% endfor %}</select></label>
+        {% if p.one_of_a_kind %}<input type="hidden" name="qty" value="1"><span class="tag unique" style="font-size:14px;padding:6px 12px">One of a kind</span>
+        {% else %}<label style="flex-direction:row;align-items:center;gap:8px">How many
+          <select name="qty">{% for n in range(1, ([p.left or 10, p.per_order_limit or 10, 10]|min) + 1) %}<option>{{ n }}</option>{% endfor %}</select></label>{% endif %}
         <button class="btn" style="flex:1">Add to cart</button>
       </div>
       {% if questions(p) %}<div class="muted" style="font-size:14px">Want them different (say, two books inscribed for different people)? Add them one at a time.</div>{% endif %}
     </form>
-    {% if p.left is not none and p.left <= 10 %}<div class="muted">Only {{ p.left }} left.</div>{% endif %}
+    {% if p.one_of_a_kind %}<div class="muted">There's only this one. Once it's sold, it's gone.</div>
+    {% elif p.left is not none and p.left <= 10 %}<div class="muted">Only {{ p.left }} left.</div>{% endif %}
     {% elif p.state == 'upcoming' %}<div class="warn">On sale {{ nice_when(p.page.starts_at) }}.</div>
     {% elif p.state == 'ended' %}<div class="warn">This sale has ended.</div>
-    {% elif p.left == 0 %}<div class="warn">Sold out.</div>
+    {% elif p.left == 0 %}<div class="warn">{{ 'This one has been sold.' if p.one_of_a_kind else 'Sold out.' }}</div>
     {% else %}<div class="warn">Not available right now.</div>{% endif %}
   </div>
 </section>

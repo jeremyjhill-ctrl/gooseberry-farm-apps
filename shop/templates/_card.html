@@ -12,7 +12,8 @@
       {% if p.hidden %}<span class="tag grey">Hidden</span>{% endif %}
       {% if p.state == 'upcoming' %}<span class="tag amber">Coming soon</span>
       {% elif p.state == 'ended' %}<span class="tag grey">Sale ended</span>
-      {% elif p.left == 0 %}<span class="tag red">Sold out</span>
+      {% elif p.left == 0 %}<span class="tag red">{{ 'Sold' if p.one_of_a_kind else 'Sold out' }}</span>
+      {% elif p.one_of_a_kind %}<span class="tag unique">One of a kind</span>
       {% elif p.left is not none and p.left <= 10 %}<span class="tag amber">Only {{ p.left }} left</span>{% endif %}
       {% if p.kind == 'pass' and p.season_label %}<span class="tag">{{ p.season_label }}</span>{% endif %}
       {% if p.kind == 'pass' or p.fulfillment == 'none' %}<span class="tag">Electronic delivery</span>{% endif %}

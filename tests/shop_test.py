@@ -257,6 +257,34 @@ c.post("/shop/admin/products/{}".format(ib["id"]), data={"name": "Inscribed book
 check("questions can be turned off", q("SELECT custom_fields FROM shop_products WHERE id=?", ib["id"])[0]["custom_fields"] == ""
       and "answer_0" not in body(guest.get("/shop/p/{}".format(ib["id"]))))
 
+# ---------------------------------------------------------------- one of a kind (e.g. a custom embroidered hat)
+c.post("/shop/admin/products/new?kind=item", data={"name": "Embroidered hat", "price": "40", "can_pickup": "1", "one_of_a_kind": "1",
+       "stock_limit": "5", "per_order_limit": "3"}, content_type="multipart/form-data")
+hat = q("SELECT * FROM shop_products WHERE name='Embroidered hat'")[0]
+check("one of a kind means exactly one, one per order", hat["one_of_a_kind"] == 1 and hat["stock_limit"] == 1 and hat["per_order_limit"] == 1, hat)
+h = body(guest.get("/shop/"))
+card = h[h.find("Embroidered hat") - 1500:h.find("Embroidered hat") + 800]
+check("card says One of a kind, not Only 1 left", "One of a kind" in card and "Only 1 left" not in card)
+h = body(guest.get("/shop/p/{}".format(hat["id"])))
+check("product page: no quantity box, the tag, and a note", '<input type="hidden" name="qty" value="1">' in h and 'name="qty">' not in h
+      and "One of a kind" in h and "Once it's sold, it's gone." in h)
+check("product form shows it ticked", 'id="one_of_a_kind" checked' in body(c.get("/shop/admin/products/{}".format(hat["id"]))))
+check("products list tags it", "One of a kind" in body(c.get("/shop/admin/products")))
+g6 = Client(wsgi.application)
+g6.post("/shop/cart/add", data={"product_id": hat["id"], "qty": 3})
+h = body(g6.get("/shop/cart"))
+check("can only put one in the cart", '<option value="1" selected>1</option>' in h and '<option value="2"' not in h)
+g6.post("/shop/cart/update", data={"qty_{}".format(hat["id"]): "4"})
+check("cart can't be bumped past one", "<option value=\"1\" selected>1</option>" in body(g6.get("/shop/cart")))
+r = g6.post("/shop/checkout", data={"name": "Hat Fan", "email": "hat@example.com", "agree": "on"})
+g6.post("/shop/pay/" + loc(r).rstrip("/").split("/")[-1], data={"card": "4242 4242 4242 4242"})
+h = body(guest.get("/shop/"))
+card = h[h.find("Embroidered hat") - 1500:h.find("Embroidered hat") + 800]
+check("once bought, the card says Sold", ">Sold<" in card and "Sold out" not in card)
+check("once bought, the page says it's been sold", "This one has been sold." in body(guest.get("/shop/p/{}".format(hat["id"]))))
+c.post("/shop/admin/products/new?kind=pass", data={"name": "Unique pass test", "price": "5", "one_of_a_kind": "1", "cq_0": "1", "ct_0": str(PLAY)}, content_type="multipart/form-data")
+check("passes ignore one of a kind", q("SELECT one_of_a_kind FROM shop_products WHERE name='Unique pass test'")[0]["one_of_a_kind"] == 0)
+
 import farm_build
 check("build number at the bottom of shop pages", "Build {}".format(farm_build.build()) in body(guest.get("/shop/")) and "buildtag" in body(c.get("/shop/admin")))
 check("build number at the bottom of playdate pages", "buildtag" in body(Client(wsgi.application).get("/book")) and "buildtag" in body(Client(wsgi.application).get("/account/login")))

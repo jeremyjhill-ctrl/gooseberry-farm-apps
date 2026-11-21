@@ -79,8 +79,18 @@
     <select name="page_id"><option value="">Main shop page</option>
       {% for pg in pages %}<option value="{{ pg.id }}" {{ 'selected' if p.page_id == pg.id }}>{{ pg.title }}</option>{% endfor %}</select></label>
   <div class="grid" style="grid-template-columns:1fr 1fr">
-    <label>How many to sell (blank = no limit) <input type="number" name="stock_limit" min="0" value="{{ p.stock_limit if p.stock_limit is not none else '' }}"></label>
-    <label>Most per order (blank = 10) <input type="number" name="per_order_limit" min="1" value="{{ p.per_order_limit if p.per_order_limit is not none else '' }}"></label>
+    {% if kind != 'pass' %}<label class="inline" style="grid-column:1/-1"><input type="checkbox" name="one_of_a_kind" value="1" id="one_of_a_kind" {{ 'checked' if p.one_of_a_kind }}>
+      <span><b>One of a kind</b>: there's just this one (a custom embroidered hat, say). Shoppers see a "One of a kind" tag instead of "Only 1 left", and it's sold one at a time.</span></label>{% endif %}
+    <label data-stock>How many to sell (blank = no limit) <input type="number" name="stock_limit" min="0" value="{{ p.stock_limit if p.stock_limit is not none else '' }}"></label>
+    <label data-stock>Most per order (blank = 10) <input type="number" name="per_order_limit" min="1" value="{{ p.per_order_limit if p.per_order_limit is not none else '' }}"></label>
+    <script>
+    (function () {  // a one-of-a-kind piece is always exactly one, so the two number boxes step aside
+      var box = document.getElementById('one_of_a_kind');
+      if (!box) return;
+      function show() { document.querySelectorAll('[data-stock]').forEach(function (e) { e.hidden = box.checked; }); }
+      box.addEventListener('change', show); show();
+    })();
+    </script>
   </div>
   <label>Extra terms the buyer agrees to (optional) <textarea name="terms" rows="2" placeholder="Flower picking depends on the weather and may end early.">{{ p.terms or '' }}</textarea></label>
   <label style="max-width:340px">Order on the page (lower numbers first) <input type="number" name="sort" value="{{ p.sort or 0 }}"></label>

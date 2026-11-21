@@ -503,7 +503,8 @@ def create_app():
         for key in list(c):
             v = request.form.get("qty_" + key, type=int)
             if v is not None:
-                c[key] = max(0, min(20, v))
+                p = row("SELECT per_order_limit FROM shop_products WHERE id=?", pid_of(key))
+                c[key] = max(0, min(int(p["per_order_limit"]) if p and p["per_order_limit"] else 20, v))
         session["cart"] = {k: v for k, v in c.items() if v > 0}
         session["cart_answers"] = {k: v for k, v in cart_answers().items() if k in session["cart"]}
         return redirect(url_for("cart_view"))
@@ -867,6 +868,7 @@ def create_app():
             fields = {
                 "kind": kind, "name": name, "description": f.get("description", "").strip(), "price": price or 0,
                 "value_price": num("value_price"), "stock_limit": num("stock_limit", int), "per_order_limit": num("per_order_limit", int),
+                "one_of_a_kind": 1 if f.get("one_of_a_kind") and kind != "pass" else 0,
                 "hidden": 1 if f.get("hidden") else 0, "page_id": f.get("page_id", type=int) or None,
                 "fulfillment": "pass" if kind == "pass" else {(True, True): "both", (True, False): "ship", (False, True): "pickup",
                                                               (False, False): "none"}[(bool(f.get("can_ship")), bool(f.get("can_pickup")))],
@@ -874,6 +876,8 @@ def create_app():
                 "valid_until": f.get("valid_until", "").strip(), "terms": f.get("terms", "").strip(),
                 "sort": num("sort", int) or 0, "photo_view": photo_view_from_form(f), "custom_fields": questions_from_form(f),
             }
+            if fields["one_of_a_kind"]:
+                fields["stock_limit"], fields["per_order_limit"] = 1, 1  # just the one
             if f.get("photo_data", "").startswith("data:"):
                 saved = save_photo(f["photo_data"])
                 if saved:

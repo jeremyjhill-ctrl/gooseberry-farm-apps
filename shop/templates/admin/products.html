@@ -13,7 +13,7 @@
     <td>{{ pages[p.page_id].title if p.page_id in pages else 'Main shop' }}</td>
     <td class="num">{{ money(p.price) }}</td>
     <td class="num">{{ p.sold }}{% if p.stock_limit %} of {{ p.stock_limit }}{% endif %}</td>
-    <td>{% if p.hidden %}<span class="tag grey">Hidden</span>{% elif p.state == 'upcoming' %}<span class="tag amber">Page not open yet</span>{% elif p.state == 'ended' %}<span class="tag grey">Sale ended</span>{% elif p.state == 'hidden' %}<span class="tag grey">Page hidden</span>{% elif p.left == 0 %}<span class="tag red">Sold out</span>{% else %}<span class="tag">On sale</span>{% endif %}</td>
+    <td>{% if p.hidden %}<span class="tag grey">Hidden</span>{% elif p.state == 'upcoming' %}<span class="tag amber">Page not open yet</span>{% elif p.state == 'ended' %}<span class="tag grey">Sale ended</span>{% elif p.state == 'hidden' %}<span class="tag grey">Page hidden</span>{% elif p.left == 0 %}<span class="tag red">{{ 'Sold' if p.one_of_a_kind else 'Sold out' }}</span>{% else %}<span class="tag">On sale</span>{% endif %}{% if p.one_of_a_kind %} <span class="tag unique">One of a kind</span>{% endif %}</td>
     <td class="row" style="gap:6px;justify-content:flex-end">
       <form method="post" action="{{ url_for('admin_product_toggle', pid=p.id) }}"><button class="btn ghost" style="min-height:36px">{{ 'Show' if p.hidden else 'Hide' }}</button></form>
       <form method="post" action="{{ url_for('admin_product_copy', pid=p.id) }}"><button class="btn ghost" style="min-height:36px">Copy</button></form>

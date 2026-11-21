@@ -179,3 +179,5 @@ input,select,textarea{max-width:100%;min-width:0}
 .credit .left{white-space:nowrap}
 .sum div span:last-child{white-space:nowrap;padding-left:8px}
 label.inline>span{flex:1 1 auto;min-width:8em}
+
+.tag.unique{background:#F3E7F7;color:#6B2E7A}  /* One of a kind */
