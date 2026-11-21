@@ -214,6 +214,13 @@ so = q("SELECT * FROM shop_orders WHERE code=?", loc(r).rstrip("/").split("/")[-
 check("ship: flat shipping, no tax out of state", so["shipping"] == 6 and so["tax"] == 0 and so["ship_state"] == "OK", so)
 check("ship: line marked ship", q("SELECT fulfillment FROM shop_order_lines WHERE order_id=?", so["id"])[0]["fulfillment"] == "ship")
 g4.post("/shop/pay/" + so["code"], data={"card": "4242 4242 4242 4242"})
+import base64 as _b64
+big_photo = "data:image/jpeg;base64," + _b64.b64encode(os.urandom(1200000)).decode()  # a 1.6 MB photo, bigger than the old 500 KB limit
+r = c.post("/shop/admin/products/new?kind=item", data={"name": "Big photo book", "price": "30", "can_ship": "1", "photo_data": big_photo}, content_type="multipart/form-data")
+big = q("SELECT * FROM shop_products WHERE name='Big photo book'")
+check("product with a full-size photo saves", r.status_code == 302 and big and big[0]["photo"], (r.status_code, body(r)[:200]))
+r = c.post("/shop/admin/products/new?kind=item", data={"name": "Huge", "price": "1", "photo_data": "x" * (13 * 1024 * 1024)}, content_type="multipart/form-data")
+check("an over-the-limit save gets a friendly message", r.status_code == 413 and "too big to save" in body(r) and not q("SELECT 1 AS x FROM shop_products WHERE name='Huge'"))
 c.post("/shop/admin/products/new?kind=item", data={"name": "Farm sponsorship", "price": "25"})
 spon = q("SELECT * FROM shop_products WHERE name='Farm sponsorship'")[0]
 check("no boxes = electronic delivery", spon["fulfillment"] == "none" and "Electronic delivery" in body(guest.get("/shop/p/{}".format(spon["id"]))))

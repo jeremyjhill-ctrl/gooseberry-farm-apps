@@ -91,7 +91,15 @@ def create_app():
     app.secret_key = (os.environ.get("SECRET_KEY") or "local-test-only-change-me") + ":shop"
     app.config.update(SESSION_COOKIE_NAME="shop_session", SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                       PERMANENT_SESSION_LIFETIME=dt.timedelta(days=30), MAX_CONTENT_LENGTH=12 * 1024 * 1024,
+                      # Photos arrive as text inside the form; Flask 3.1 otherwise refuses form fields over 500 KB.
+                      MAX_FORM_MEMORY_SIZE=12 * 1024 * 1024,
                       TEMPLATES_AUTO_RELOAD=True)
+
+    @app.errorhandler(413)
+    def too_big(e):
+        return render_template("message.html", title="That was too big to save",
+                               body="Usually that's a very large photo. Try a smaller picture (or a screenshot of it) and "
+                                    "save again. Nothing was changed."), 413
     login_tries = {}
 
     # ------------------------------------------------------------ database
