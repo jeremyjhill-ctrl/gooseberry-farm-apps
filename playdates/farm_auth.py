@@ -87,8 +87,10 @@ def _hash(token):
 
 
 def hash_password(pw):
+    # pbkdf2 works on every Python (the Mac's built-in Python 3.9 has no scrypt, werkzeug's default).
+    # Passwords already saved with scrypt on the live server still check fine there.
     from werkzeug.security import generate_password_hash
-    return generate_password_hash(pw)
+    return generate_password_hash(pw, method="pbkdf2:sha256")
 
 
 def check_password(pw_hash, pw):

@@ -18,3 +18,9 @@ The code is owned by the "Booking App - Original Chat 1" chat (since Nov 20, 202
    pushes to GitHub on [l]ive, and updates the folder's code).
 
 Never: put secrets in the repo, touch Desktop/Booking App (the untouched original), or touch Pasture Keeper.
+
+## Test like the Mac before delivering
+Publish Farm Apps runs every check on Jeremy's Mac, which uses Apple's built-in **Python 3.9 without hashlib.scrypt**
+and only the packages in its .venv (flask 3.1.3, werkzeug 3.1.9, jinja2 3.1.6, qrcode 8.2, ...; no psycopg or gunicorn).
+Run the checks under a Python 3.9 with those packages and `del hashlib.scrypt` first; code must not need newer Python
+syntax or scrypt (passwords use pbkdf2:sha256).
