@@ -138,7 +138,11 @@ textarea{border:1px solid #C9CEC0;border-radius:10px;padding:10px 12px;font-size
 input[type=datetime-local]{height:46px;border:1px solid #C9CEC0;border-radius:10px;padding:0 12px;font-size:16px;font-family:inherit;background:#fff}
 .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
 .product{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:var(--ink)}
-.product .ph{aspect-ratio:4/3;background:var(--tint) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#7C9A6C;font-family:Fredoka,sans-serif;font-size:20px}
+.product .ph{aspect-ratio:4/3;background:var(--tint) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#7C9A6C;font-family:Fredoka,sans-serif;font-size:20px;position:relative;overflow:hidden}
+.product .ph.whole{background:#fff}
+.product .ph img{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
+.photoedit .ph{cursor:grab;touch-action:none}.photoedit .ph.whole{cursor:default}.photoedit .ph:active{cursor:grabbing}
+.photoedit input[type=range]{width:100%;accent-color:var(--green)}
 .product .bd{padding:14px 16px;display:flex;flex-direction:column;gap:6px;flex:1}
 .product h3{font-size:19px}
 .price{font-weight:800;font-size:18px}

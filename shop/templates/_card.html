@@ -1,6 +1,6 @@
 {% macro product_card(p) %}
 <a class="product" href="{{ url_for('product', pid=p.id) }}">
-  <div class="ph" {% if p.photo %}style="background-image:url('{{ url_for('photo', name=p.photo) }}')"{% endif %}>{% if not p.photo %}{{ p.name[:1] }}{% endif %}</div>
+  {% from '_photo.html' import photo_box %}{{ photo_box(p) }}
   <div class="bd">
     <h3>{{ p.name }}</h3>
     {% if p.credits %}<ul class="includes">{% for c in p.credits %}<li>{{ c.qty }} × {{ c.name }}</li>{% endfor %}</ul>{% endif %}

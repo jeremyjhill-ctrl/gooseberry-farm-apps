@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS shop_products (
   name TEXT NOT NULL,
   description TEXT DEFAULT '',
   photo TEXT DEFAULT '',
+  photo_view TEXT DEFAULT '',          -- how the photo sits in its box: fit, position, zoom (see shop photo_view)
   price REAL NOT NULL DEFAULT 0,
   value_price REAL,                    -- "a $150 value"
   stock_limit INTEGER,                 -- blank = no limit
@@ -152,6 +153,7 @@ def today_iso():
 def ensure_schema(con):
     """Create the shop tables if they're new, and two starter credit types the first time."""
     con.executescript(SCHEMA)
+    add_column(con, "shop_products", "photo_view", "TEXT DEFAULT ''")  # added Nov 20, 2026
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():
         if not con.execute("SELECT 1 FROM shop_credit_types").fetchone():
             for i, (name, value, role, farm) in enumerate(STARTER_TYPES):
@@ -160,6 +162,21 @@ def ensure_schema(con):
         con.execute("INSERT OR IGNORE INTO shop_settings(key, value) VALUES ('seeded', 'true')")
     if hasattr(con, "commit"):
         con.commit()
+
+
+def add_column(con, table, column, decl):
+    """Adds a column to a table made by an earlier version (works on SQLite and Postgres)."""
+    try:
+        con.execute("SELECT {} FROM {} WHERE 1=0".format(column, table)).fetchall()
+    except Exception:  # noqa: BLE001  the column isn't there yet
+        if hasattr(con, "rollback"):
+            try:
+                con.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+        con.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, decl))
+        if hasattr(con, "commit"):
+            con.commit()
 
 
 def new_code(con, table="shop_passes"):

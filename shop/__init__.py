@@ -319,6 +319,29 @@ def create_app():
                 f.write(data)
         return name
 
+    def photo_view(p):
+        """How a product photo sits in its box: fit 'fill' (cover, drag + zoom) or 'whole' (nothing cut off)."""
+        v = {"fit": "fill", "x": 50.0, "y": 50.0, "zoom": 1.0}
+        try:
+            got = json.loads((p.get("photo_view") if hasattr(p, "get") else "") or "{}")
+            if got.get("fit") in ("fill", "whole"):
+                v["fit"] = got["fit"]
+            v["x"] = min(100.0, max(0.0, float(got.get("x", 50))))
+            v["y"] = min(100.0, max(0.0, float(got.get("y", 50))))
+            v["zoom"] = min(4.0, max(1.0, float(got.get("zoom", 1))))
+        except (ValueError, TypeError, AttributeError):
+            pass
+        return v
+
+    def photo_view_from_form(f):
+        def n(k, lo, hi, d):
+            try:
+                return round(min(hi, max(lo, float(f.get(k, d)))), 2)
+            except (TypeError, ValueError):
+                return d
+        return json.dumps({"fit": "whole" if f.get("photo_fit") == "whole" else "fill",
+                           "x": n("photo_x", 0, 100, 50), "y": n("photo_y", 0, 100, 50), "zoom": n("photo_zoom", 1, 4, 1)})
+
     def plain(x):
         """120.0 -> 120, 12.5 -> 12.50, for number boxes in the admin."""
         from jinja2 import Undefined
@@ -332,7 +355,7 @@ def create_app():
 
     app.jinja_env.filters["plain"] = plain
     app.jinja_env.globals.update(money=money, nice_day=fp.nice_day, nice_when=nice_when, pretty_code=fp.pretty_code,
-                                 booking_url=booking_url, is_admin=is_admin)
+                                 booking_url=booking_url, is_admin=is_admin, photo_view=photo_view)
 
     @app.context_processor
     def inject():
@@ -776,7 +799,7 @@ def create_app():
                                                               (False, False): "none"}[(bool(f.get("can_ship")), bool(f.get("can_pickup")))],
                 "taxable": 1 if f.get("taxable") else 0, "season_label": f.get("season_label", "").strip(),
                 "valid_until": f.get("valid_until", "").strip(), "terms": f.get("terms", "").strip(),
-                "sort": num("sort", int) or 0,
+                "sort": num("sort", int) or 0, "photo_view": photo_view_from_form(f),
             }
             if f.get("photo_data", "").startswith("data:"):
                 saved = save_photo(f["photo_data"])

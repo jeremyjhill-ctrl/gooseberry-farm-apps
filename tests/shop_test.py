@@ -219,6 +219,22 @@ big_photo = "data:image/jpeg;base64," + _b64.b64encode(os.urandom(1200000)).deco
 r = c.post("/shop/admin/products/new?kind=item", data={"name": "Big photo book", "price": "30", "can_ship": "1", "photo_data": big_photo}, content_type="multipart/form-data")
 big = q("SELECT * FROM shop_products WHERE name='Big photo book'")
 check("product with a full-size photo saves", r.status_code == 302 and big and big[0]["photo"], (r.status_code, body(r)[:200]))
+bid = big[0]["id"] if big else 0
+r = c.post("/shop/admin/products/{}".format(bid), data={"name": "Big photo book", "price": "30", "can_ship": "1",
+           "photo_fit": "whole", "photo_x": "20", "photo_y": "80", "photo_zoom": "2"}, content_type="multipart/form-data")
+pv = json.loads(q("SELECT photo_view FROM shop_products WHERE id=?", bid)[0]["photo_view"] or "{}")
+check("photo settings save", pv == {"fit": "whole", "x": 20.0, "y": 80.0, "zoom": 2.0}, pv)
+check("photo kept when only settings change", q("SELECT photo FROM shop_products WHERE id=?", bid)[0]["photo"] == big[0]["photo"])
+h = body(guest.get("/shop/p/{}".format(bid)))
+check("whole photo shows uncropped on the product page", "object-fit:contain" in h and 'class="ph whole"' in h)
+c.post("/shop/admin/products/{}".format(bid), data={"name": "Big photo book", "price": "30", "can_ship": "1",
+       "photo_fit": "fill", "photo_x": "-40", "photo_y": "300", "photo_zoom": "9"}, content_type="multipart/form-data")
+pv = json.loads(q("SELECT photo_view FROM shop_products WHERE id=?", bid)[0]["photo_view"])
+check("photo settings kept in range", pv == {"fit": "fill", "x": 0.0, "y": 100.0, "zoom": 4.0}, pv)
+h = body(guest.get("/shop/"))
+check("shop cards use the photo settings", "object-position:0.0% 100.0%" in h and "scale(4.0)" in h)
+h = body(c.get("/shop/admin/products/{}".format(bid)))
+check("photo editor shows on the product form", 'id="photo_box"' in h and 'name="photo_zoom"' in h and 'id="photo_rotate"' in h)
 r = c.post("/shop/admin/products/new?kind=item", data={"name": "Huge", "price": "1", "photo_data": "x" * (13 * 1024 * 1024)}, content_type="multipart/form-data")
 check("an over-the-limit save gets a friendly message", r.status_code == 413 and "too big to save" in body(r) and not q("SELECT 1 AS x FROM shop_products WHERE name='Huge'"))
 c.post("/shop/admin/products/new?kind=item", data={"name": "Farm sponsorship", "price": "25"})

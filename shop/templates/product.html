@@ -4,7 +4,7 @@
 {% block body %}
 {% if p.page %}<a href="{{ url_for('page', slug=p.page.slug) }}" style="font-weight:700;text-decoration:none">‹ {{ p.page.title }}</a>{% else %}<a href="{{ url_for('home') }}" style="font-weight:700;text-decoration:none">‹ Shop</a>{% endif %}
 <section class="card" style="padding:0;overflow:hidden">
-  {% if p.photo %}<div class="product" style="border:0;border-radius:0"><div class="ph" style="background-image:url('{{ url_for('photo', name=p.photo) }}')"></div></div>{% endif %}
+  {% from '_photo.html' import photo_box %}{% if p.photo %}<div class="product" style="border:0;border-radius:0">{{ photo_box(p) }}</div>{% endif %}
   <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
     <h1>{{ p.name }}</h1>
     <div class="row" style="gap:10px"><span class="price" style="font-size:24px">{{ money(p.price) }}</span>

@@ -37,7 +37,7 @@ visible to you while you're logged in, with a banner.
 - `playdate_safety_test.py`: 66 checks covering booking, holds, the declined card, price and tax, adding people, moving,
   check-in, gate sales, stopping and closing days, the calendar, reminders, reports and price presets.
   Passes identically on the original Booking App, this version on the Mac, and this version on Postgres.
-- `shop_test.py`: 124 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows), items the buyer can have shipped or pick up, electronic delivery,
+- `shop_test.py`: 130 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows), items the buyer can have shipped or pick up, electronic delivery, full-size photos and photo placement (fill + drag + zoom, or whole photo),
   booking playdates with a pass (fully covered, partly covered, refused), gate tick-offs and undo, the seasonal switch,
   credits returned when the farm cancels, hand-made codes, expired / turned-off passes, code-guessing lockout, and hiding
   the shop and the booking page.

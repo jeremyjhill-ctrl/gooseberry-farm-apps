@@ -1,0 +1,9 @@
+{# One product photo in its box, placed the way it was set up in the admin (fill + drag + zoom, or the whole photo). #}
+{% macro photo_box(p, id='', empty=None) -%}
+{%- set v = photo_view(p) -%}
+<div class="ph{{ ' whole' if v.fit == 'whole' }}"{% if id %} id="{{ id }}"{% endif %}>
+  {%- if p.photo %}<img src="{{ url_for('photo', name=p.photo) }}" alt="" loading="lazy" draggable="false"
+    style="object-fit:{{ 'contain' if v.fit == 'whole' else 'cover' }};object-position:{{ v.x }}% {{ v.y }}%;transform:scale({{ v.zoom if v.fit == 'fill' else 1 }});transform-origin:{{ v.x }}% {{ v.y }}%">
+  {%- else %}<span>{{ empty if empty is not none else (p.name or '?')[:1] }}</span>{% endif -%}
+</div>
+{%- endmacro %}

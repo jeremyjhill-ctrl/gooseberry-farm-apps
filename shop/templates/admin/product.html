@@ -37,11 +37,27 @@
   </div>
   {% endif %}
   <label>Description <textarea name="description" rows="4">{{ p.description or '' }}</textarea></label>
-  <label>Photo
-    <div class="product" style="max-width:260px"><div class="ph" id="photo_data_preview" {% if p.photo %}style="background-image:url('{{ url_for('photo', name=p.photo) }}')"{% endif %}>{% if not p.photo %}No photo{% endif %}</div></div>
-    <input type="file" accept="image/*" data-photo="photo_data"></label>
-  <input type="hidden" name="photo_data" id="photo_data">
-  {% if p.photo %}<label class="inline"><input type="checkbox" name="remove_photo"> <span>Remove the photo</span></label>{% endif %}
+  {% from '_photo.html' import photo_box %}{% set v = photo_view(p) %}
+  <div class="photoedit" style="display:flex;flex-direction:column;gap:10px">
+    <b style="font-size:14px">Photo</b>
+    <div class="product" style="max-width:340px;width:100%">{{ photo_box(p, id='photo_box', empty='No photo yet') }}</div>
+    <div id="photo_tools" style="display:flex;flex-direction:column;gap:10px" {{ 'hidden' if not p.photo }}>
+      <div class="muted" data-fill-only>This is how it looks on the shop. Drag the photo to choose what shows.</div>
+      <div class="row">
+        <label class="inline"><input type="radio" name="photo_fit" value="fill" {{ 'checked' if v.fit == 'fill' }}> <span>Fill the box</span></label>
+        <label class="inline"><input type="radio" name="photo_fit" value="whole" {{ 'checked' if v.fit == 'whole' }}> <span>Show the whole photo (good for book covers)</span></label>
+      </div>
+      <label data-fill-only style="max-width:340px">Zoom <input type="range" name="photo_zoom" min="1" max="3" step="0.05" value="{{ v.zoom }}"></label>
+      <div class="row">
+        <button type="button" class="btn ghost small" id="photo_center" data-fill-only>Center it</button>
+        <button type="button" class="btn ghost small" id="photo_rotate">Rotate ↻</button>
+      </div>
+    </div>
+    <input type="hidden" name="photo_x" value="{{ v.x }}"><input type="hidden" name="photo_y" value="{{ v.y }}">
+    <label>{{ 'Choose a different photo' if p.photo else 'Choose a photo' }} <input type="file" accept="image/*" data-photo="photo_data"></label>
+    <input type="hidden" name="photo_data" id="photo_data">
+    {% if p.photo %}<label class="inline"><input type="checkbox" name="remove_photo"> <span>Remove the photo</span></label>{% endif %}
+  </div>
   <label>Sale page
     <select name="page_id"><option value="">Main shop page</option>
       {% for pg in pages %}<option value="{{ pg.id }}" {{ 'selected' if p.page_id == pg.id }}>{{ pg.title }}</option>{% endfor %}</select></label>
