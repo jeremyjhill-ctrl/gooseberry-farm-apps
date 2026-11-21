@@ -4,9 +4,12 @@
   doesn't change it; it only decides which app answers each visitor.
 - Mollie's bakery answers at its own web address (any host starting with "bakery.", or the
   hosts listed in BAKERY_HOSTS), and at /bakery/ on this server for local testing.
-- The farm shop (passes, bundles, products) answers at any host starting with "shop." (or the
-  hosts in SHOP_HOSTS), and at /shop/ for local testing. It shares the playdate database so
-  passes can pay for bookings; it shares nothing with the bakery.
+- Every other address is the farm's one address (shop.gooseberrybridge.com once it's connected; the
+  onrender.com address meanwhile): playdate booking at /book, the staff admin at /admin, and the farm
+  shop at /shop/ (its admin at /shop/admin). The front page shows the shop while it's open, and the
+  booking page while the shop is hidden (see farm_passes.register). One layout everywhere means a pass
+  or ticket link works the same on any of the farm's addresses. The shop shares the playdate database
+  so passes can pay for bookings; it shares nothing with the bakery.
 
 Run locally:   python wsgi.py           -> http://127.0.0.1:5050/book, /shop/ and /bakery/
 On Render:     gunicorn wsgi:application
@@ -37,7 +40,6 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware  # noqa: E402
 bakery = create_app()
 shop = farm_shop.create_app()
 BAKERY_HOSTS = {h.strip().lower() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()}
-SHOP_HOSTS = {h.strip().lower() for h in os.environ.get("SHOP_HOSTS", "").split(",") if h.strip()}
 by_path = DispatcherMiddleware(playdates.app.wsgi_app, {"/bakery": bakery.wsgi_app, "/shop": shop.wsgi_app})
 
 
@@ -46,8 +48,6 @@ def application(environ, start_response):
     host = host.split(",")[0].split(":")[0].strip().lower()
     if host in BAKERY_HOSTS or host.startswith("bakery."):
         return bakery.wsgi_app(environ, start_response)
-    if host in SHOP_HOSTS or host.startswith("shop."):
-        return shop.wsgi_app(environ, start_response)
     if environ.get("PATH_INFO") in ("/bakery", "/shop"):
         start_response("301 Moved Permanently", [("Location", environ.get("SCRIPT_NAME", "") + environ["PATH_INFO"] + "/")])
         return [b""]

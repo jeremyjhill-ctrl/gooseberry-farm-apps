@@ -260,15 +260,8 @@ def admin_urls(request):
     host = request.host.split(":")[0].lower()
     root = request.host_url  # e.g. https://gooseberry-farm-apps.onrender.com/
     bakery_hosts = [h.strip() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()]
-    if host.startswith("shop."):
-        playdates = "https://booking." + host[len("shop."):] + "/admin"
-        shop = root + "admin"
-    elif host.startswith("booking."):
-        playdates = root + "admin"
-        shop = os.environ.get("SHOP_URL", "").rstrip("/") + "/admin" if os.environ.get("SHOP_URL") else root + "shop/admin"
-    else:
-        playdates = root + "admin"
-        shop = root + "shop/admin"
+    playdates = root + "admin"  # one farm address for playdates and the shop
+    shop = root + "shop/admin"
     bakery = ("https://{}/#admin".format(bakery_hosts[0]) if bakery_hosts and host not in bakery_hosts else root + "bakery/#admin")
     return {"playdates": playdates, "shop": shop, "bakery": bakery}
 

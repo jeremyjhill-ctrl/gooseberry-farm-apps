@@ -2,6 +2,13 @@
 {% from "_card.html" import product_card %}
 {% block body %}
 <section class="pagehead"><h1>{{ SS.shop_name }}</h1>{% for para in SS.intro.split('\n\n') %}<p style="margin:0">{{ para }}</p>{% endfor %}</section>
+{% if booking_open %}
+<a class="card bookplay" href="{{ booking_url('/book') }}">
+  <div><h2 style="margin:0">Book a playdate</h2>
+    <p class="muted" style="margin:4px 0 0">Visit our baby animals. Pick a day and arrival time, and have a pass or gift code handy if you've got one.</p></div>
+  <span class="btn">Book a playdate</span>
+</a>
+{% endif %}
 {% for pg in pages %}
 <section class="card">
   <div class="row between"><h2>{{ pg.title }}</h2>

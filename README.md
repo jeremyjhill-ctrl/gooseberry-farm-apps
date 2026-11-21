@@ -13,9 +13,8 @@ One program, one server, several storefronts:
   live server's database (`playdates/dbcompat.py`). Still in **test mode**: test card only, messages show in Admin > Messages.
 - **Mollie's Farmhouse Bakery** preorders (`bakery/`): its own pages, data, login, photos and Stripe keys.
 
-`wsgi.py` decides which app answers: addresses starting with `bakery.` go to the bakery, `shop.` to the farm shop;
-everything else goes to playdates. On one computer (and on any playdate address) the shop is also at `/shop/` and the
-bakery at `/bakery/`.
+`wsgi.py` decides which app answers: addresses starting with `bakery.` (or in BAKERY_HOSTS) go to Mollie's bakery; every other address is the farm's one address (shop.gooseberrybridge.com once connected): the shop at `/shop/` (front page while it's open), booking at `/book`, the staff admin at `/admin`, the shop admin at `/shop/admin`.
+On the Mac everything answers on one address, with the bakery at `/bakery/`.
 
 **Hiding things:** the shop admin's Home page has switches for the whole shop and for the playdate booking page
 (also on Playdate admin > Pricing & schedule). Each product and sale page has its own Hide button. Hidden things stay
@@ -37,7 +36,7 @@ visible to you while you're logged in, with a banner.
 - `playdate_safety_test.py`: 66 checks covering booking, holds, the declined card, price and tax, adding people, moving,
   check-in, gate sales, stopping and closing days, the calendar, reminders, reports and price presets.
   Passes identically on the original Booking App, this version on the Mac, and this version on Postgres.
-- `shop_test.py`: 156 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows), items the buyer can have shipped or pick up, electronic delivery, full-size photos and photo placement (fill + drag + zoom, or whole photo), questions for the buyer (e.g. book inscriptions), one-of-a-kind items,
+- `shop_test.py`: 168 checks covering building a catalog, selling a pass bundle (tax, shipping, stock, sale windows), items the buyer can have shipped or pick up, electronic delivery, full-size photos and photo placement (fill + drag + zoom, or whole photo), questions for the buyer (e.g. book inscriptions), one-of-a-kind items,
   booking playdates with a pass (fully covered, partly covered, refused), gate tick-offs and undo, the seasonal switch,
   credits returned when the farm cancels, hand-made codes, expired / turned-off passes, code-guessing lockout, and hiding
   the shop and the booking page.
@@ -52,7 +51,7 @@ Everyone has their own email + password (playdates/farm_auth.py). The owner tick
 **Logins** (top bar of either farm admin, `/account/logins`): Playdates, Farm shop, Bakery, Manage logins.
 - Each app keeps taking its old shared password (`ADMIN_PASSWORD` for playdates + shop, `BAKERY_PASSWORD` for the
   bakery) until at least one person has a personal login for it. Then only personal logins work there.
-- Playdates and the shop share one login; on gooseberrybridge.com addresses it covers booking. and shop. together.
+- Playdates and the shop share one address and one login.
 - Mollie's bakery is on her own address, so she logs in there separately, on pages in her own branding. Her bakery
   still uses only her own Stripe keys (`BAKERY_STRIPE_*`); logins don't connect the money in any way.
 - Passwords are stored as one-way hashes. Turning someone off, or a password reset, logs them out everywhere.

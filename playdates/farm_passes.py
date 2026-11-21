@@ -508,13 +508,7 @@ def register(pd):
         return [dict(u, code=pretty_code(u["code"])) for u in booking_uses(pd.db(), b["id"])]
 
     def shop_admin_url():
-        """Where the farm shop's admin lives: its own address online, /shop/ on the Mac."""
-        import os
-        if os.environ.get("SHOP_URL"):
-            return os.environ["SHOP_URL"].rstrip("/") + "/admin"
-        host = request.host.split(":")[0]
-        if host.startswith("booking."):
-            return "https://shop." + host[len("booking."):] + "/admin"
+        """The farm shop's admin: /shop/admin on the same address as everything else."""
         return request.host_url + "shop/admin"
 
     app.jinja_env.globals.update(pass_panel=pass_panel, pass_uses_for=pass_uses_for, pretty_code=pretty_code,
@@ -575,6 +569,26 @@ def register(pd):
 
     # -------- hide the booking page from guests (admins still see it, with a banner)
     GUEST_PAGES = {"home", "book", "hold"}
+
+    @app.before_request
+    def front_page_is_the_shop():
+        # One farm address: its front page is the shop while the shop is open (which has a
+        # "Book a playdate" tile), and the booking page while the shop is hidden.
+        if request.endpoint != "home" or shop_hidden():
+            return None
+        return redirect(request.script_root + "/shop/")
+
+    def shop_hidden():
+        try:
+            r = pd.db().execute("SELECT value FROM shop_settings WHERE key='shop_hidden'").fetchone()
+        except Exception:  # noqa: BLE001  (shop tables not made yet)
+            return True
+        if not r:
+            return True  # the shop starts hidden
+        try:
+            return bool(json.loads(r[0]))
+        except (ValueError, TypeError):
+            return True
 
     @app.before_request
     def hidden_booking_page():

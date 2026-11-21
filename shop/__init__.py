@@ -14,7 +14,6 @@ Settings (environment variables):
   SECRET_KEY            signs the login cookie (the shop uses its own cookie name)
   PLAYDATE_DB           on the Mac: the playdate database file (the shop's tables live in it)
   DATABASE_URL          on Render: the Postgres server (farm_apps database)
-  BOOKING_URL, SHOP_URL optional: the public addresses, if they can't be worked out from the host
   R2_*                  Cloudflare R2 for product photos (same bucket as the bakery, "shop/" folder)
 """
 import base64
@@ -180,12 +179,7 @@ def create_app():
         return wrapped
 
     def booking_url(path="/book"):
-        if os.environ.get("BOOKING_URL"):
-            return os.environ["BOOKING_URL"].rstrip("/") + path
-        host = request.host.split(":")[0]
-        if host.startswith("shop."):
-            return "https://booking." + host[len("shop."):] + path
-        return request.host_url.rstrip("/") + path  # on the Mac: same server, booking app at the root
+        return request.host_url.rstrip("/") + path  # booking lives on the same address as the shop
 
     def qr_svg(data):
         if not qrcode:
@@ -419,7 +413,8 @@ def create_app():
         pages = [p for p in pages if p["state"] in ("open", "upcoming")]
         for p in pages:
             p["products"] = visible_products(p["id"], include_upcoming=True)
-        return render_template("home.html", pages=pages, products=visible_products())
+        return render_template("home.html", pages=pages, products=visible_products(),
+                               booking_open=not playdate_settings().get("booking_hidden"))
 
     @app.get("/s/<slug>")
     def page(slug):
