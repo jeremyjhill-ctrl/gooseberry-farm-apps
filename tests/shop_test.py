@@ -35,6 +35,13 @@ guest = Client(wsgi.application)      # a customer
 results, failures = [], []
 
 
+def real_orders():
+    """Treat every order so far as real (as if paid with a live Stripe key)."""
+    c_ = dbcompat.connect(os.environ["PLAYDATE_DB"], isolation_level=None)
+    c_.execute("UPDATE shop_orders SET test=0")
+    c_.close()
+
+
 def check(name, ok, detail=""):
     results.append({"step": name, "ok": bool(ok)})
     if not ok:
@@ -251,6 +258,7 @@ mail = q("SELECT body FROM outbox WHERE recipient='ann@example.com' ORDER BY id 
 check("receipt email shows the answers", mail and "How would you like it inscribed?: To Pat" in mail[0]["body"], mail[:1])
 oid = q("SELECT id FROM shop_orders WHERE code=?", oc)[0]["id"]
 check("admin order page shows the answers", "Happy canning!" in body(c.get("/shop/admin/orders/" + oc)))
+real_orders()  # (these checks are about real orders; with no live Stripe key every order is a test)
 check("orders spreadsheet has the answers", "How would you like it inscribed?: To Pat | Anything else we should know?: It's a gift" in body(c.get("/shop/admin/orders.csv")))
 c.post("/shop/admin/products/{}".format(ib["id"]), data={"name": "Inscribed book", "price": "30", "can_pickup": "1", "q_label_0": ""},
        content_type="multipart/form-data")
@@ -503,6 +511,7 @@ for path in ["/shop/admin/products/new?kind=pass", "/shop/admin/products/new?kin
 check("pass search finds the gift name", P in body(c.get("/shop/admin/passes?q=Miller")).replace("-", ""))
 r = c.get("/shop/admin")
 check("dashboard shows credits still owed", "Credits still owed" in body(r))
+real_orders()
 r = c.get("/shop/admin/orders.csv")
 check("orders spreadsheet", r.status_code == 200 and "Spring Family Pass" in body(r))
 c.post("/shop/admin/orders/{}/fulfilled".format(ocode), data={"tell": "1"})
@@ -519,6 +528,43 @@ r = c.post("/shop/admin/settings", data={"shop_name": "Farm Shop", "intro": "Hi"
 check("settings save", r.status_code == 302 and json.loads(q("SELECT value FROM shop_settings WHERE key='shipping_flat'")[0]["value"]) == 5)
 check("playdate admin links to the shop", "/shop/admin" in body(c.get("/admin")))
 check("bakery untouched", Client(wsgi.application).get("/bakery/").status_code == 200)
+
+# ---------------------------------------------------------------- test orders: tagged, hidden, deletable
+real_orders()
+c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "0"})
+c.post("/shop/admin/products/new?kind=pass", data={"name": "Test-order pass", "price": "20", "cq_0": "1", "ct_0": str(PLAY)})
+TP = q("SELECT id FROM shop_products WHERE name='Test-order pass'")[0]["id"]
+g9 = Client(wsgi.application)
+g9.post("/shop/cart/add", data={"product_id": TP, "qty": 1})
+r = g9.post("/shop/checkout", data={"name": "Tess Test", "email": "tess@example.com", "agree": "on",
+                                    "ship_line1": "1 Main St", "ship_city": "Ozark", "ship_state": "MO", "ship_zip": "65721"})
+tcode = loc(r).rstrip("/").split("/")[-1]
+g9.post("/shop/pay/" + tcode, data={"card": "4242424242424242"})
+T = q("SELECT * FROM shop_orders WHERE code=?", tcode)[0]
+check("an order with no live Stripe key is tagged Test", T["test"] == 1 and T["status"] == "paid", T)
+ol = body(c.get("/shop/admin/orders"))
+check("test orders stay off the Orders list", "Tess Test" not in ol and "Test orders (1)" in ol)
+check("...and out of the spreadsheet", "Tess Test" not in body(c.get("/shop/admin/orders.csv")))
+check("...but show under Test orders", "Tess Test" in body(c.get("/shop/admin/orders?status=test")))
+real = q("SELECT code FROM shop_orders WHERE test=0 AND status='paid' ORDER BY id LIMIT 1")[0]["code"]
+r = c.post("/shop/admin/orders/{}/delete".format(real))
+check("a real order can't be deleted", q("SELECT id FROM shop_orders WHERE code=?", real) and "Only test orders" in body(c.get(loc(r))))
+tp = q("SELECT id FROM shop_passes WHERE order_id=?", T["id"])
+check("(setup) the test order made a pass", len(tp) == 1)
+r = guest.post("/shop/admin/orders/delete-tests")
+check("customers can't delete anything", q("SELECT id FROM shop_orders WHERE code=?", tcode))
+real_before = {"lines": q("SELECT COUNT(*) AS n FROM shop_order_lines WHERE order_id IN (SELECT id FROM shop_orders WHERE test=0)")[0]["n"],
+               "passes": q("SELECT COUNT(*) AS n FROM shop_passes WHERE order_id IN (SELECT id FROM shop_orders WHERE test=0)")[0]["n"],
+               "credits": q("SELECT COUNT(*) AS n FROM shop_pass_credits WHERE pass_id IN (SELECT p.id FROM shop_passes p JOIN shop_orders o ON o.id=p.order_id WHERE o.test=0)")[0]["n"]}
+r = c.post("/shop/admin/orders/delete-tests")
+real_after = {"lines": q("SELECT COUNT(*) AS n FROM shop_order_lines WHERE order_id IN (SELECT id FROM shop_orders WHERE test=0)")[0]["n"],
+              "passes": q("SELECT COUNT(*) AS n FROM shop_passes WHERE order_id IN (SELECT id FROM shop_orders WHERE test=0)")[0]["n"],
+              "credits": q("SELECT COUNT(*) AS n FROM shop_pass_credits WHERE pass_id IN (SELECT p.id FROM shop_passes p JOIN shop_orders o ON o.id=p.order_id WHERE o.test=0)")[0]["n"]}
+check("...real orders keep every item, pass and credit", real_before == real_after and real_before["passes"] > 0, (real_before, real_after))
+check("Delete all test orders removes them and their passes", not q("SELECT id FROM shop_orders WHERE code=?", tcode)
+      and not q("SELECT id FROM shop_passes WHERE order_id=?", T["id"]) and not q("SELECT id FROM shop_pass_credits WHERE pass_id=?", tp[0]["id"])
+      and not q("SELECT id FROM shop_order_lines WHERE order_id=?", T["id"]))
+check("...and leaves real orders alone", q("SELECT id FROM shop_orders WHERE code=?", real) and q("SELECT COUNT(*) AS n FROM shop_orders WHERE test=0")[0]["n"] > 0)
 
 # ---------------------------------------------------------------- staff adjust any credit on a pass
 r = c.post("/shop/admin/passes/new", data={"title": "Adjust me", "cq_0": "1", "ct_0": str(PLAY), "cq_1": "5", "ct_1": str(EXTRA)})

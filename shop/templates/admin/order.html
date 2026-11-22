@@ -4,7 +4,7 @@
 {% block body %}
 <a href="{{ url_for('admin_orders') }}" style="font-weight:700;text-decoration:none">‹ Orders</a>
 <section class="card">
-  <div class="row between"><h1>{{ o.name }}</h1><span class="tag {{ '' if o.status == 'paid' else 'grey' }}">{{ o.status }}</span></div>
+  <div class="row between"><h1>{{ o.name }}</h1><span class="row" style="gap:6px">{% if o.test %}<span class="tag amber">Test</span>{% endif %}<span class="tag {{ '' if o.status == 'paid' else 'grey' }}">{{ o.status }}</span></span></div>
   <div class="muted">Order <span class="code">{{ pretty_code(o.code) }}</span> · {{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }} · {{ o.email }}{% if o.phone %} · {{ o.phone }}{% endif %}</div>
   {% if o.pay_note %}<div class="warn" role="alert">{{ o.pay_note }}</div>{% endif %}
   {% if o.status == 'paid' %}<div class="muted">Paid by {{ {'stripe': 'card through Stripe', 'test_card': 'the test card (no real money)', 'free': 'nothing: it was free'}.get(o.method, o.method or '') }}{% if stripe_link %} · <a href="{{ stripe_link }}" target="_blank" rel="noopener">See it in Stripe</a> (refunds are done there){% endif %}</div>{% endif %}
@@ -57,4 +57,10 @@
 {% endif %}
 <details class="card"><summary style="font-weight:700;cursor:pointer">Terms they agreed to ({{ (o.agreed_at or '')[:16].replace('T', ' ') }})</summary>
   {% for para in (o.agreed_terms or '').split('\n\n') %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}</details>
+{% if o.test %}
+<details class="card"><summary style="font-weight:700;cursor:pointer">Delete this test order</summary>
+  <form method="post" action="{{ url_for('admin_order_delete', code=o.code) }}" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+    <div class="muted">Removes it for good, with its passes and practice labels.</div>
+    <button class="btn ghost">Delete test order</button></form></details>
+{% endif %}
 {% endblock %}

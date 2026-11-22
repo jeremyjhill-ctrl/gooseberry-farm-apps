@@ -10,24 +10,28 @@
   <div class="warn" role="alert">{{ problem }}</div>
   {% else %}
   {% if labels %}<div class="warn" role="alert">This order already has a label. Only buy another if you're sending a second box.</div>{% endif %}
-  {% if missing %}<div class="muted">Add a packed weight and box size to <b>{{ missing|join(', ') }}</b> (on the product) and this fills itself in next time.</div>{% endif %}
+  {% if missing %}<div class="muted">Add a packed weight to <b>{{ missing|join(', ') }}</b> (on the product) and this fills itself in next time.</div>{% endif %}
+  {% if nobox %}<div class="muted"><b>{{ nobox|join(', ') }}</b> {{ 'has' if nobox|length == 1 else 'have' }} no box yet: give the product a shipping profile or its own box size.</div>{% endif %}
   <form method="get" class="pkg" data-no-lock>
     <label>Pounds <input type="number" name="lb" min="0" step="1" inputmode="numeric" value="{{ ((weight or 0) // 16)|int if weight else '' }}"></label>
     <label>Ounces <input type="number" name="oz" min="0" step="0.1" inputmode="decimal" value="{{ '%g'|format((weight or 0) % 16) if weight else '' }}"></label>
-    <label class="boxin">Box, inches <input type="text" name="box" value="{{ box_text }}" placeholder="10x8x4"></label>
+    <label class="boxin">Box <select name="template">
+      <option value="" {{ 'selected' if not template }}>My own box (size below)</option>
+      {% for k, t in templates.items() %}<option value="{{ k }}" {{ 'selected' if template == k }}>{{ t[0] }}</option>{% endfor %}</select></label>
+    <label class="boxin">Own box, inches <input type="text" name="box" value="{{ box_text }}" placeholder="10x8x4"></label>
     <button class="btn ghost">Update prices</button>
   </form>
   {% if error %}<div class="flash err" role="alert">{{ error }}</div>{% endif %}
   {% if rates %}
-  <div class="muted">Prices for this package. The cheapest is first. Prints on: {{ label_size }}.</div>
+  <div class="muted">Prices for this package{{ ', ' ~ templates[template][0] if template }}. Prints on: {{ label_size }}.</div>
   <form method="post" action="{{ url_for('admin_label_buy', code=o.code) }}" class="rates">
-    <input type="hidden" name="weight_oz" value="{{ weight }}"><input type="hidden" name="box" value="{{ box_text }}">
+    <input type="hidden" name="weight_oz" value="{{ weight }}"><input type="hidden" name="box" value="{{ templates[template][0] if template else box_text }}">
     {% if labels %}<input type="hidden" name="another" value="1">{% endif %}
     <label class="inline"><input type="checkbox" name="tell" value="1" {{ 'checked' if label_mode != 'test' }}> <span>Email the buyer their tracking number</span></label>
     {% for r in rates %}
     <div class="rate{{ ' best' if loop.first }}">
       <div class="ratewho"><b>{{ r.carrier }} {{ r.service }}</b>
-        <span class="muted">{% if r.days %}about {{ r.days }} day{{ 's' if r.days != 1 }}{% elif r.terms %}{{ r.terms }}{% endif %}{% if loop.first %} · cheapest{% endif %}</span></div>
+        <span class="muted">{% if r.days %}about {{ r.days }} day{{ 's' if r.days != 1 }}{% elif r.terms %}{{ r.terms }}{% endif %}{% if r.preferred %} · suggested by the product's shipping profile{% elif loop.first or (loop.index0 == 1 and rates[0].preferred) %}{% if not r.preferred and rates[0].preferred %} · cheapest other{% else %} · cheapest{% endif %}{% endif %}</span></div>
       <button class="btn{{ '' if loop.first else ' ghost' }}" name="pick" value="{{ loop.index0 }}">Buy {{ money(r.amount) }}</button>
       <input type="hidden" name="rate_{{ loop.index0 }}" value="{{ r.id }}|{{ r.amount }}|{{ r.carrier }}|{{ r.service }}">
     </div>

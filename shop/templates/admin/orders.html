@@ -2,13 +2,23 @@
 {% block title %}Orders{% endblock %}
 {% block body %}
 <div class="row between"><h1>Orders</h1><a class="btn ghost" href="{{ url_for('admin_orders_csv') }}">Download spreadsheet</a></div>
-<div class="row">{% for k, label in [('paid', 'Paid'), ('pending', 'In checkout'), ('expired', 'Timed out'), ('all', 'All')] %}<a class="pill {{ 'on' if status == k }}" href="{{ url_for('admin_orders', status=k) }}">{{ label }}</a>{% endfor %}</div>
+<div class="row">{% for k, label in [('paid', 'Paid'), ('pending', 'In checkout'), ('expired', 'Timed out'), ('all', 'All')] %}<a class="pill {{ 'on' if status == k }}" href="{{ url_for('admin_orders', status=k) }}">{{ label }}</a>{% endfor %}
+  {% if tests %}<a class="pill {{ 'on' if status == 'test' }}" href="{{ url_for('admin_orders', status='test') }}">Test orders ({{ tests }})</a>{% endif %}</div>
+{% if status == 'test' %}
+<section class="card">
+  <div class="muted">Orders placed before the shop takes real money (the pretend card, or Stripe's sandbox). They're left out of the other lists, the spreadsheet and the counts.</div>
+  {% if orders %}<details><summary class="btn ghost" style="display:inline-block;cursor:pointer">Delete all test orders…</summary>
+    <form method="post" action="{{ url_for('admin_orders_delete_tests') }}" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+      <div class="muted">Removes all {{ orders|length }} for good, with their passes and practice labels. Real orders are never touched.</div>
+      <button class="btn">Yes, delete the test orders</button></form></details>{% endif %}
+</section>
+{% endif %}
 <section class="card scroll">
 <table>
   <tr><th>Order</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>To do</th></tr>
   {% for o in orders %}
   <tr>
-    <td><a href="{{ url_for('admin_order', code=o.code) }}" class="code">{{ pretty_code(o.code) }}</a><div class="muted">{{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }}</div></td>
+    <td><a href="{{ url_for('admin_order', code=o.code) }}" class="code">{{ pretty_code(o.code) }}</a>{% if o.test %} <span class="tag amber">Test</span>{% endif %}<div class="muted">{{ (o.paid_at or o.created_at or '')[:16].replace('T', ' ') }}</div></td>
     <td><b>{{ o.name }}</b><div class="muted">{{ o.email }}</div></td>
     <td>{% for l in o.lines %}{{ l.qty }} × {{ l.name }}{% for a in answers_of(l) %}<div class="muted" style="font-size:13px">{{ a.q }} {{ a.a }}</div>{% endfor %}<br>{% endfor %}</td>
     <td class="num">{{ money(o.total) }}</td>

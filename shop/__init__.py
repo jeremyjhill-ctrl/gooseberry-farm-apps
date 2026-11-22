@@ -74,7 +74,9 @@ DEFAULT_SETTINGS = {
               "Seasonal items like flower picking depend on the weather and may end early, so please use your credits accordingly. "
               "Playdates still need an arrival time: book online with your pass code when dates are released."),
     "tax_rate": None,          # blank = use the playdate app's sales tax rate
-    "shipping_flat": 6.0,      # one flat shipping charge per order that has anything to ship
+    "shipping_flat": 6.0,      # shipping for an item with no shipping profile (see Settings > Shipping)
+    "ship_extra_item": 2.0,    # each extra item shipped in the same order adds this (the highest item's charge counts in full)
+    "free_ship_over": None,    # free shipping when the shipped items total at least this ($); blank = never
     "pickup_note": "We'll email you when your order is ready to pick up at the farm.",
     "home_state": "MO",
     "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
@@ -138,6 +140,12 @@ def create_app():
 
     con = connect()
     fp.ensure_schema(con)
+    if stripe_mode != "live" and not con.execute("SELECT 1 FROM shop_settings WHERE key='orders_tagged_test'").fetchone():
+        # Everything ordered before the shop took real money was a test: tag it once (Nov 21, 2026).
+        con.execute("UPDATE shop_orders SET test=1")
+        con.execute("INSERT OR REPLACE INTO shop_settings(key, value) VALUES ('orders_tagged_test', 'true')")
+        if hasattr(con, "commit"):
+            con.commit()
     con.close()
     fa.ensure_schema()
 
@@ -267,7 +275,25 @@ def create_app():
         p["state"] = page_state(p["page"])
         p["buyable"] = (not p["hidden"] and not p["archived"] and p["state"] == "open" and (p["left"] is None or p["left"] > 0)
                         and (not settings()["shop_hidden"] or is_admin()))  # staff can test-buy while it's hidden
+        p["ship_profile"] = ship_profile(p.get("ship_profile_id"))
+        p["ship_charge"] = ship_charge(p)
         return p
+
+    def ship_profiles(include_archived=False):
+        return rows("SELECT * FROM shop_ship_profiles" + ("" if include_archived else " WHERE archived=0") + " ORDER BY sort, id")
+
+    def ship_profile(pid):
+        if not pid:
+            return None
+        cache = g.setdefault("_ship_profiles", {})
+        if pid not in cache:
+            cache[pid] = row("SELECT * FROM shop_ship_profiles WHERE id=? AND archived=0", pid)
+        return cache[pid]
+
+    def ship_charge(p):
+        """What shipping one of this product costs the buyer: its profile's price, or the standard charge."""
+        prof = ship_profile(p.get("ship_profile_id")) if hasattr(p, "get") else None
+        return round(float(prof["price"] if prof else (settings()["shipping_flat"] or 0)), 2)
 
     def visible_products(page_id=None, include_upcoming=False):
         q = "SELECT * FROM shop_products WHERE archived = 0 AND hidden = 0 AND "
@@ -339,7 +365,7 @@ def create_app():
         choice = any(l["product"]["fulfillment"] == "both" for l in lines)
         ship_always = any(l["product"]["fulfillment"] == "ship" for l in lines)
         ships = any(how_for(l["product"], how) == "ship" for l in lines)
-        shipping = round(float(s["shipping_flat"] or 0), 2) if ships else 0.0
+        shipping = shipping_for(lines, how) if ships else 0.0
         state = (ship_state or "").strip().upper()
         home = (s.get("home_state") or "MO").upper()
         taxable = 0.0
@@ -353,7 +379,23 @@ def create_app():
         tax = round(taxable * float(s["tax_rate"]) / 100.0, 2)
         return {"sub": sub, "shipping": shipping, "tax": tax, "total": round(sub + shipping + tax, 2), "ships": ships,
                 "choice": choice, "ship_always": ship_always, "how": how if choice else "",
-                "flat": round(float(s["shipping_flat"] or 0), 2)}
+                "flat": shipping_for(lines, "ship"), "free_over": s.get("free_ship_over")}
+
+    def shipping_for(lines, how):
+        """The buyer's shipping: the highest item's charge in full, plus the add-on for every other item shipped,
+        and nothing once the shipped items reach the free-shipping amount."""
+        s = settings()
+        charges, value = [], 0.0
+        for l in lines:
+            if how_for(l["product"], how) == "ship":
+                charges += [l["product"]["ship_charge"]] * int(l["qty"])
+                value += l["amount"]
+        if not charges:
+            return 0.0
+        free = s.get("free_ship_over")
+        if free not in (None, "") and value >= float(free):
+            return 0.0
+        return round(max(charges) + float(s.get("ship_extra_item") or 0) * (len(charges) - 1), 2)
 
     def housekeeping():
         db().execute("UPDATE shop_orders SET status='expired' WHERE status='pending' AND hold_expires < ?", (now().isoformat(),))
@@ -585,11 +627,12 @@ def create_app():
                         terms = terms_for(lines, s)
                         cur = con.execute("""INSERT INTO shop_orders(code, status, name, email, phone, ship_name, ship_line1, ship_line2,
                                 ship_city, ship_state, ship_zip, subtotal, shipping, tax, total, agreed_terms, agreed_at, created_at,
-                                hold_expires, hold_ip) VALUES (?, 'pending', ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                hold_expires, hold_ip, test) VALUES (?, 'pending', ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                                           (code, name, email, phone, ship["name"] or name, ship["line1"], ship["line2"], ship["city"],
                                            ship["state"].upper(), ship["zip"], t["sub"], t["shipping"], t["tax"], t["total"],
                                            terms, now().isoformat(), now().isoformat(),
-                                           (now() + dt.timedelta(minutes=HOLD_MINUTES)).isoformat(), ip))
+                                           (now() + dt.timedelta(minutes=HOLD_MINUTES)).isoformat(), ip,
+                                           0 if stripe_mode == "live" else 1))  # no real money yet: a test order
                         oid = cur.lastrowid
                         for l in lines:
                             p = l["product"]
@@ -1031,14 +1074,15 @@ def create_app():
     @admin_required
     def admin_home():
         pd = playdate_settings()
-        paid = rows("SELECT * FROM shop_orders WHERE status='paid' ORDER BY id DESC")
+        paid = rows("SELECT * FROM shop_orders WHERE status='paid' AND test=0 ORDER BY id DESC")
         return render_template("admin/home.html", pd=pd, recent=paid[:8], orders_count=len(paid),
                                revenue=round(sum(o["subtotal"] for o in paid), 2),
-                               passes_sold=row("SELECT COUNT(*) AS n FROM shop_passes WHERE source='sale'")["n"],
+                               passes_sold=row("SELECT COUNT(*) AS n FROM shop_passes WHERE source='sale' AND COALESCE(order_id, 0) NOT IN "
+                                               "(SELECT id FROM shop_orders WHERE test=1)")["n"],
                                passes_made=row("SELECT COUNT(*) AS n FROM shop_passes WHERE source='made'")["n"],
                                outstanding=fp.outstanding(db()),
                                to_ship=row("""SELECT COUNT(DISTINCT o.id) AS n FROM shop_orders o JOIN shop_order_lines l ON l.order_id=o.id
-                                              WHERE o.status='paid' AND o.fulfilled_at IS NULL AND l.fulfillment IN ('ship','pickup')""")["n"],
+                                              WHERE o.status='paid' AND o.test=0 AND o.fulfilled_at IS NULL AND l.fulfillment IN ('ship','pickup')""")["n"],
                                booking_hidden_default=fp.BOOKING_HIDDEN_MESSAGE)
 
     @app.post("/admin/visibility")
@@ -1126,6 +1170,7 @@ def create_app():
                 if any(dims) and not all(d and d > 0 for d in dims):
                     errors.append("Please fill in all three box measurements (length, width, height), or leave them all blank.")
                 fields["ship_box"] = "x".join("{:g}".format(d) for d in dims) if all(dims) else ""
+                fields["ship_profile_id"] = f.get("ship_profile_id", type=int) or None
             if fields["one_of_a_kind"]:
                 fields["stock_limit"], fields["per_order_limit"] = 1, 1  # just the one
             if f.get("photo_data", "").startswith("data:"):
@@ -1156,7 +1201,7 @@ def create_app():
                                    "season_label": "Good during the {} season".format(now().year + 1) if kind == "pass" else "",
                                    "valid_until": "{}-12-31".format(now().year + 1) if kind == "pass" else ""}
             p["credits"] = product_credits(p["id"]) if p.get("id") else []
-        return render_template("admin/product.html", p=p, kind=kind, errors=errors, types=credit_types(),
+        return render_template("admin/product.html", p=p, kind=kind, errors=errors, types=credit_types(), profiles=ship_profiles(),
                                pages=rows("SELECT * FROM shop_pages WHERE archived=0 ORDER BY sort, id"),
                                sold_count=sold(p["id"]) if p.get("id") else 0)
 
@@ -1300,12 +1345,55 @@ def create_app():
     @admin_required
     def admin_orders():
         status = request.args.get("status", "paid")
-        q = "SELECT * FROM shop_orders" + ("" if status == "all" else " WHERE status=?") + " ORDER BY id DESC LIMIT 300"
-        orders = rows(q, *([] if status == "all" else [status]))
+        if status == "test":
+            orders = rows("SELECT * FROM shop_orders WHERE test=1 ORDER BY id DESC LIMIT 300")
+        else:
+            q = "SELECT * FROM shop_orders WHERE test=0" + ("" if status == "all" else " AND status=?") + " ORDER BY id DESC LIMIT 300"
+            orders = rows(q, *([] if status == "all" else [status]))
         for o in orders:
             o["lines"] = rows("SELECT * FROM shop_order_lines WHERE order_id=?", o["id"])
             o["needs"] = sorted({l["fulfillment"] for l in o["lines"] if l["fulfillment"] in ("ship", "pickup")})
-        return render_template("admin/orders.html", orders=orders, status=status)
+        return render_template("admin/orders.html", orders=orders, status=status,
+                               tests=row("SELECT COUNT(*) AS n FROM shop_orders WHERE test=1")["n"])
+
+    def delete_orders(where, *args):
+        """Removes orders for good, with their lines, passes (and those passes' credits and history) and labels.
+        Only ever called for test orders."""
+        ids = [r["id"] for r in rows("SELECT id FROM shop_orders WHERE test=1 AND " + where, *args)]
+        con = db()
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            for oid in ids:
+                for p in rows("SELECT id FROM shop_passes WHERE order_id=?", oid):
+                    for t in ("shop_pass_credits", "shop_pass_uses", "shop_pass_holds"):
+                        con.execute("DELETE FROM {} WHERE pass_id=?".format(t), (p["id"],))
+                    con.execute("DELETE FROM shop_passes WHERE id=?", (p["id"],))
+                for t in ("shop_order_lines", "shop_labels"):
+                    con.execute("DELETE FROM {} WHERE order_id=?".format(t), (oid,))
+                con.execute("DELETE FROM shop_orders WHERE id=? AND test=1", (oid,))
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+        return len(ids)
+
+    @app.post("/admin/orders/delete-tests")
+    @admin_required
+    def admin_orders_delete_tests():
+        n = delete_orders("1=1")
+        flash("Deleted {} test order{}.".format(n, "" if n == 1 else "s") if n else "There were no test orders.")
+        return redirect(url_for("admin_orders"))
+
+    @app.post("/admin/orders/<code>/delete")
+    @admin_required
+    def admin_order_delete(code):
+        o = order_by_code(code)
+        if not o.get("test"):
+            flash("Only test orders can be deleted. Refund a real order in Stripe instead.")
+            return redirect(url_for("admin_order", code=o["code"]))
+        delete_orders("id=?", o["id"])
+        flash("Deleted test order {}.".format(fp.pretty_code(o["code"])))
+        return redirect(url_for("admin_orders", status="test"))
 
     @app.get("/admin/orders/<code>")
     @admin_required
@@ -1355,18 +1443,34 @@ def create_app():
         return [l for l in o["lines"] if l["fulfillment"] == "ship"]
 
     def parcel_guess(o):
-        """The package for this order from its products' packed weights and boxes: weights add up, the biggest box wins.
-        Returns (weight_oz or None, box tuple or None, [names of items missing a weight or box])."""
-        weight, box, missing = 0.0, None, []
+        """The package for this order from its products: weights add up; the biggest box wins (the product's own box,
+        else its shipping profile's box or USPS flat-rate box). Returns dict: weight (oz or None), box (L,W,H or None),
+        template ('' or a USPS flat-rate token), prefer (a preferred label service or ''), missing (names of items with no
+        weight), nobox (names of items with no box)."""
+        out = {"weight": 0.0, "box": None, "template": "", "prefer": "", "missing": [], "nobox": []}
+        biggest = 0.0
         for l in shipping_lines(o):
-            p = row("SELECT name, ship_weight_oz, ship_box FROM shop_products WHERE id=?", l["product_id"]) or {}
-            b = parse_box(p.get("ship_box"))
-            if not p.get("ship_weight_oz") or not b:
-                missing.append(l["name"])
-            weight += float(p.get("ship_weight_oz") or 0) * int(l["qty"])
-            if b and (not box or b[0] * b[1] * b[2] > box[0] * box[1] * box[2]):
-                box = b
-        return (round(weight, 2) or None), box, missing
+            p = row("SELECT name, ship_weight_oz, ship_box, ship_profile_id FROM shop_products WHERE id=?", l["product_id"]) or {}
+            prof = ship_profile(p.get("ship_profile_id"))
+            if not p.get("ship_weight_oz"):
+                out["missing"].append(l["name"])
+            out["weight"] += float(p.get("ship_weight_oz") or 0) * int(l["qty"])
+            own = parse_box(p.get("ship_box"))
+            if own:
+                box, template = own, ""
+            elif prof and prof.get("template") in farm_shippo.TEMPLATES:
+                box, template = farm_shippo.TEMPLATES[prof["template"]][1:], prof["template"]
+            else:
+                box, template = (parse_box(prof.get("box")) if prof else None), ""
+            if not box:
+                out["nobox"].append(l["name"])
+                continue
+            size = box[0] * box[1] * box[2]
+            if size > biggest:
+                biggest = size
+                out.update(box=box, template=template, prefer=(prof or {}).get("service") or "")
+        out["weight"] = round(out["weight"], 2) or None
+        return out
 
     def ship_to(o):
         a = {"name": o["ship_name"] or o["name"], "street1": o["ship_line1"], "street2": o["ship_line2"] or "",
@@ -1398,27 +1502,31 @@ def create_app():
     @app.route("/admin/orders/<code>/label", methods=["GET", "POST"])
     @admin_required
     def admin_label(code):
-        """Prices for this order's package, cheapest first; one tap buys the label."""
+        """Prices for this order's package (preferred service first, then cheapest); one tap buys the label."""
         o = order_by_code(code)
         problem = label_ready(o)
-        guess_w, guess_box, missing = parcel_guess(o)
+        guess = parcel_guess(o)
         f = request.values
-        weight = guess_w
+        weight = guess["weight"]
         if f.get("lb") or f.get("oz"):  # staff changed the weight on this page
             try:
                 weight = round(float(f.get("lb") or 0) * 16 + float(f.get("oz") or 0), 2) or None
             except ValueError:
                 weight = None
-        box = parse_box(f.get("box")) if f.get("box") else guess_box
-        rates, error, shipment = [], "", ""
+        template, box = guess["template"], guess["box"]
+        if "template" in f or f.get("box"):  # staff picked a flat-rate box, or typed their own box, on this page
+            template = f.get("template") if f.get("template") in farm_shippo.TEMPLATES else ""
+            box = farm_shippo.TEMPLATES[template][1:] if template else parse_box(f.get("box"))
+        rates, error = [], ""
         if not problem and weight and box:
             try:
-                shipment, rates = farm_shippo.rates(ship_from(), ship_to(o), weight, box)
+                _, rates = farm_shippo.rates(ship_from(), ship_to(o), weight, box, template=template, prefer=guess["prefer"])
             except farm_shippo.ShippoError as e:
                 error = str(e)
         return render_template("admin/label.html", o=o, problem=problem, rates=rates, error=error, weight=weight, box=box,
-                               missing=missing, labels=[x for x in order_labels(o) if x["status"] == "bought"],
-                               box_text="x".join("{:g}".format(d) for d in box) if box else "",
+                               template=template, templates=farm_shippo.TEMPLATES, missing=guess["missing"], nobox=guess["nobox"],
+                               labels=[x for x in order_labels(o) if x["status"] == "bought"],
+                               box_text="x".join("{:g}".format(d) for d in box) if box and not template else "",
                                label_mode=farm_shippo.mode(), label_size=LABEL_SIZES.get(settings()["label_size"], ""))
 
     @app.post("/admin/orders/<code>/label/buy")
@@ -1510,6 +1618,60 @@ def create_app():
               "Don't use that label.")
         return redirect(url_for("admin_order", code=o["code"]))
 
+    @app.post("/admin/settings/shipping")
+    @admin_required
+    def admin_settings_shipping():
+        """What buyers pay for shipping: the standard charge, the add-on per extra item, free shipping, and the profiles."""
+        f = request.form
+
+        def money_in(k, blank=None):
+            v = f.get(k, "").strip().replace("$", "")
+            if not v:
+                return blank
+            try:
+                return max(0.0, round(float(v), 2))
+            except ValueError:
+                return "bad"
+        vals = {"shipping_flat": money_in("shipping_flat", 0.0), "ship_extra_item": money_in("ship_extra_item", 0.0),
+                "free_ship_over": money_in("free_ship_over", None)}
+        if "bad" in vals.values():
+            flash("Shipping amounts should be numbers, like 6 or 2.50.")
+            return redirect(url_for("admin_settings") + "#shipping")
+        for k, v in vals.items():
+            save_setting(k, v)
+        problems = []
+        ids = [x for x in f.getlist("prof_id")]
+        for i, pid in enumerate(ids + ["new"]):
+            key = "new" if pid == "new" else pid
+            name = f.get("prof_name_" + key, "").strip()[:80]
+            if pid == "new" and not name:
+                continue
+            if pid != "new" and f.get("prof_remove_" + key):
+                db().execute("UPDATE shop_ship_profiles SET archived=1 WHERE id=?", (int(pid),))
+                db().execute("UPDATE shop_products SET ship_profile_id=NULL WHERE ship_profile_id=?", (int(pid),))
+                continue
+            price = money_in("prof_price_" + key, None)
+            template = f.get("prof_template_" + key, "")
+            template = template if template in farm_shippo.TEMPLATES else ""
+            box = parse_box(f.get("prof_box_" + key, "")) if not template else None
+            service = f.get("prof_service_" + key, "")
+            service = service if service in farm_shippo.SERVICES else ""
+            if not name or price in (None, "bad"):
+                problems.append("{}: needs a name and a price".format(name or "A new profile"))
+                continue
+            if not template and f.get("prof_box_" + key, "").strip() and not box:
+                problems.append("{}: write the box size like 10x8x4".format(name))
+                continue
+            box_text = "x".join("{:g}".format(d) for d in box) if box else ""
+            if pid == "new":
+                db().execute("INSERT INTO shop_ship_profiles(name, price, template, box, service, sort, created_at) VALUES (?,?,?,?,?,?,?)",
+                             (name, price, template, box_text, service, len(ids), now().isoformat()))
+            else:
+                db().execute("UPDATE shop_ship_profiles SET name=?, price=?, template=?, box=?, service=? WHERE id=?",
+                             (name, price, template, box_text, service, int(pid)))
+        flash("Shipping saved." if not problems else "Saved, except: " + "; ".join(problems) + ".")
+        return redirect(url_for("admin_settings") + "#shipping")
+
     @app.post("/admin/settings/labels")
     @admin_required
     def admin_settings_labels():
@@ -1527,7 +1689,7 @@ def create_app():
         w = csv.writer(out)
         w.writerow(["Order", "Paid", "Name", "Email", "Phone", "Item", "Qty", "Each", "Buyer's answers", "Fulfillment", "Ship to",
                     "Order subtotal", "Shipping", "Tax", "Total", "Done"])
-        for o in rows("SELECT * FROM shop_orders WHERE status='paid' ORDER BY id"):
+        for o in rows("SELECT * FROM shop_orders WHERE status='paid' AND test=0 ORDER BY id"):
             ship_to = ", ".join(x for x in [o["ship_name"], o["ship_line1"], o["ship_line2"], o["ship_city"], o["ship_state"], o["ship_zip"]] if x) \
                 if o["ship_line1"] else ""
             for l in rows("SELECT * FROM shop_order_lines WHERE order_id=?", o["id"]):
@@ -1601,7 +1763,7 @@ def create_app():
             f = request.form
             for k in ("shop_name", "intro", "terms", "pickup_note", "shop_hidden_message"):
                 save_setting(k, f.get(k, "").strip() or DEFAULT_SETTINGS[k])
-            for k in ("shipping_flat", "tax_rate"):
+            for k in [k for k in ("shipping_flat", "tax_rate") if k in f]:
                 v = f.get(k, "").strip().replace("$", "").replace("%", "")
                 try:
                     save_setting(k, float(v) if v else (None if k == "tax_rate" else 0.0))
@@ -1613,7 +1775,8 @@ def create_app():
                                own_tax=row("SELECT value FROM shop_settings WHERE key='tax_rate'"),
                                stripe_mode=stripe_mode, stripe_webhook_set=bool(webhook_secret), stripe_events=STRIPE_EVENTS,
                                webhook_url=url_for("stripe_webhook", _external=True),
-                               label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES)
+                               label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES, profiles=ship_profiles(),
+                               templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES)
 
     @app.post("/admin/settings/email")
     @admin_required

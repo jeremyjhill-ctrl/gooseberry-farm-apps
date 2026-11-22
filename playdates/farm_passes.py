@@ -98,6 +98,17 @@ CREATE TABLE IF NOT EXISTS shop_order_lines (
   fulfillment TEXT, taxable INTEGER, gift_for TEXT,
   answers TEXT DEFAULT ''              -- the buyer's answers to the product's questions (JSON)
 );
+CREATE TABLE IF NOT EXISTS shop_ship_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,                  -- "Book (Media Mail)", "Medium flat-rate box"
+  price REAL NOT NULL DEFAULT 0,       -- what the buyer pays for shipping one item
+  template TEXT DEFAULT '',            -- a USPS flat-rate box/envelope (Shippo parcel template), or '' for our own box
+  box TEXT DEFAULT '',                 -- our own box, "LxWxH" inches (when template is '')
+  service TEXT DEFAULT '',             -- preferred label service, e.g. usps_media_mail ('' = cheapest)
+  sort INTEGER DEFAULT 0,
+  archived INTEGER DEFAULT 0,
+  created_at TEXT
+);
 CREATE TABLE IF NOT EXISTS shop_labels (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL,
@@ -182,6 +193,10 @@ def ensure_schema(con):
     add_column(con, "shop_products", "ship_weight_oz", "REAL")
     add_column(con, "shop_products", "ship_box", "TEXT DEFAULT ''")
     add_column(con, "shop_orders", "label_claim", "TEXT DEFAULT ''")
+    # Shipping profiles, added Nov 21, 2026: which profile a shippable product uses (what the buyer pays, which box).
+    add_column(con, "shop_products", "ship_profile_id", "INTEGER")
+    # Test orders, added Nov 21, 2026: orders placed before the shop takes real money (test card or Stripe's sandbox).
+    add_column(con, "shop_orders", "test", "INTEGER DEFAULT 0")
     import farm_mail
     farm_mail.ensure_schema(con, add_column)  # email status on Admin > Messages (added Nov 21, 2026)
     if not con.execute("SELECT 1 FROM shop_settings WHERE key='seeded'").fetchone():

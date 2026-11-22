@@ -23,7 +23,7 @@ REPLACE_KEYS = {"settings": "key", "day_overrides": "date", "stopped_days": "dat
 # Tables with an auto-numbered id (so cursor.lastrowid works).
 ID_TABLES = {"bookings", "payments", "outbox",
              "shop_credit_types", "shop_pages", "shop_products", "shop_product_credits", "shop_orders",
-             "shop_order_lines", "shop_passes", "shop_pass_credits", "shop_pass_uses", "farm_users", "shop_labels"}
+             "shop_order_lines", "shop_passes", "shop_pass_credits", "shop_pass_uses", "farm_users", "shop_labels", "shop_ship_profiles"}
 
 _pg_url = None
 

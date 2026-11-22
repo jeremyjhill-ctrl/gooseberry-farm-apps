@@ -36,7 +36,11 @@
     <div class="muted">Tick both and the buyer chooses at checkout. Tick neither for <b>electronic delivery</b> (nothing to ship or pick up; the buyer just gets the order email).</div>
     {% set w = p.ship_weight_oz or 0 %}{% set bx = (p.ship_box or '').split('x') %}
     <div class="shipsize" style="display:flex;flex-direction:column;gap:6px">
-      <b style="font-size:14px">Packed for shipping <span class="muted" style="font-weight:400">(for shipping labels: weigh it boxed up, and measure the box, once)</span></b>
+      <label style="max-width:420px">Shipping profile <select name="ship_profile_id">
+        <option value="">Standard shipping ({{ money(SS.shipping_flat) }})</option>
+        {% for pr in profiles %}<option value="{{ pr.id }}" {{ 'selected' if p.ship_profile_id == pr.id }}>{{ pr.name }} ({{ money(pr.price) }})</option>{% endfor %}</select></label>
+      <div class="muted">What the buyer pays to ship it, and which box the label uses. Set profiles up in Settings &gt; Shipping.</div>
+      <b style="font-size:14px">Packed for shipping <span class="muted" style="font-weight:400">(weigh it boxed up, once; a box size here overrides the profile's box)</span></b>
       <div class="grid" style="grid-template-columns:repeat(2,minmax(0,140px));gap:8px">
         <label>Pounds <input type="number" name="ship_lb" min="0" step="1" inputmode="numeric" value="{{ (w // 16)|int if w else '' }}"></label>
         <label>Ounces <input type="number" name="ship_oz" min="0" step="0.1" inputmode="decimal" value="{{ '%g'|format(w % 16) if w else '' }}"></label>

@@ -79,6 +79,8 @@ def standin(method, path, data=None):
              "servicelevel": {"name": "Priority Mail", "token": "usps_priority"}},
             {"object_id": "rate_ga_{}".format(n), "amount": "5.62", "provider": "USPS", "estimated_days": 4,
              "servicelevel": {"name": "Ground Advantage", "token": "usps_ground_advantage"}},
+            {"object_id": "rate_mm_{}".format(n), "amount": "6.20", "provider": "USPS", "estimated_days": 6,
+             "servicelevel": {"name": "Media Mail", "token": "usps_media_mail"}},
             {"object_id": "rate_bad", "amount": None, "provider": "X"}]}
     if path == "/transactions/" and method == "POST":
         if TROUBLE["slow_buy"]:
@@ -215,8 +217,9 @@ check("the label page is one form with a Buy button per price", 'name="pick" val
       and page.count('name="tell"') == 1, list(picks))
 staff.post("/shop/admin/orders/{}/label/buy".format(cX), data=dict(picks, pick="1", weight_oz="36", box="12x9x3"))
 LX = labels(cX)
-check("pressing the second Buy buys that price, recorded right", LX and calls("/transactions/", "POST")[-1][2]["rate"] == picks["rate_1"].split("|")[0]
-      and LX[0]["cost"] == 9.85 and LX[0]["service"] == "Priority Mail" and LX[0]["weight_oz"] == 36 and LX[0]["box"] == "12x9x3", (picks, LX))
+rid1, amt1, car1, svc1 = picks["rate_1"].split("|")
+check("pressing the second Buy buys that price, recorded right", LX and calls("/transactions/", "POST")[-1][2]["rate"] == rid1
+      and LX[0]["cost"] == float(amt1) and LX[0]["service"] == svc1 and LX[0]["weight_oz"] == 36 and LX[0]["box"] == "12x9x3", (picks, LX))
 
 # ---------------------------------------------------------------- void
 CALLS.clear()
@@ -316,6 +319,83 @@ os.environ["SHIPPO_API_KEY"] = "shippo_live_standin"
 lp = body(staff.get("/shop/admin/orders/{}/label?lb=1&box=8x8x8".format(c5)))
 check("live key: Email them tracking starts ticked", 'name="tell" value="1" checked' in lp and "Practice labels" not in lp)
 os.environ["SHIPPO_API_KEY"] = "shippo_test_standin"
+
+# ---------------------------------------------------------------- shipping profiles: what buyers pay, and which box/service labels use
+staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "free_ship_over": "",
+                                                 "prof_name_new": "Book", "prof_price_new": "5", "prof_template_new": "", "prof_box_new": "11x8.5x2",
+                                                 "prof_service_new": "usps_media_mail"})
+staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "free_ship_over": "",
+                                                 "prof_id": [str(x["id"]) for x in q("SELECT id FROM shop_ship_profiles WHERE archived=0")],
+                                                 **{"prof_name_{}".format(x["id"]): x["name"] for x in q("SELECT * FROM shop_ship_profiles")},
+                                                 **{"prof_price_{}".format(x["id"]): str(x["price"]) for x in q("SELECT * FROM shop_ship_profiles")},
+                                                 **{"prof_box_{}".format(x["id"]): x["box"] for x in q("SELECT * FROM shop_ship_profiles")},
+                                                 **{"prof_service_{}".format(x["id"]): x["service"] for x in q("SELECT * FROM shop_ship_profiles")},
+                                                 "prof_name_new": "Medium flat-rate box", "prof_price_new": "10",
+                                                 "prof_template_new": "USPS_MediumFlatRateBox1"})
+PR = {x["name"]: x for x in q("SELECT * FROM shop_ship_profiles WHERE archived=0")}
+check("shipping profiles are saved", set(PR) == {"Book", "Medium flat-rate box"} and PR["Book"]["price"] == 5 and PR["Book"]["box"] == "11x8.5x2"
+      and PR["Book"]["service"] == "usps_media_mail" and PR["Medium flat-rate box"]["template"] == "USPS_MediumFlatRateBox1", PR)
+r = staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "prof_name_new": "No price", "prof_price_new": ""})
+check("a profile without a price isn't saved, and it says so", "No price" not in [x["name"] for x in q("SELECT name FROM shop_ship_profiles")]
+      and "needs a name and a price" in flashes(staff, loc(r)))
+s = body(staff.get("/shop/admin/settings"))
+check("Settings lists the profiles, the flat-rate boxes and Media Mail", "Medium flat-rate box" in s and "USPS Medium Flat Rate Box (opens on top)" in s
+      and "USPS Media Mail" in s and 'name="free_ship_over"' in s)
+staff.post("/shop/admin/products/new?kind=item", data={"name": "Cookbook", "price": "25", "can_ship": "1", "ship_lb": "1", "ship_oz": "8",
+                                                       "ship_profile_id": str(PR["Book"]["id"])})
+staff.post("/shop/admin/products/new?kind=item", data={"name": "Jam sampler", "price": "30", "can_ship": "1", "ship_lb": "3",
+                                                       "ship_profile_id": str(PR["Medium flat-rate box"]["id"])})
+CB = q("SELECT * FROM shop_products WHERE name='Cookbook'")[0]
+JS = q("SELECT * FROM shop_products WHERE name='Jam sampler'")[0]
+check("a product keeps its shipping profile", CB["ship_profile_id"] == PR["Book"]["id"])
+check("the product form offers the profiles", "Medium flat-rate box ($10)" in body(staff.get("/shop/admin/products/{}".format(CB["id"]))))
+check("the product page shows its own shipping charge", "$5 shipping" in body(Client(wsgi.application).get("/shop/p/{}".format(CB["id"]))))
+
+
+def shipping_of(items):
+    code = buy("ship{}@example.com".format(len(CALLS)), items)
+    return order(code)["shipping"], code
+
+
+sh, _ = shipping_of([(CB["id"], 1)])
+check("one book: the Book charge", sh == 5, sh)
+sh, _ = shipping_of([(CB["id"], 2)])
+check("two books: $5 + $2 for the second", sh == 7, sh)
+sh, _ = shipping_of([(CB["id"], 1), (JS["id"], 1)])
+check("book + flat-rate box: the higher charge + $2", sh == 12, sh)
+sh, _ = shipping_of([(CB["id"], 1), (MUG, 1)])
+check("book + a product with no profile: standard $6 is higher, + $2", sh == 8, sh)
+staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "free_ship_over": "50"})
+sh, _ = shipping_of([(JS["id"], 2)])
+check("free shipping once the shipped items reach $50", sh == 0, sh)
+sh, _ = shipping_of([(CB["id"], 1)])
+check("...but not below it", sh == 5, sh)
+check("the product page mentions free shipping", "Free shipping on $50 or more" in body(Client(wsgi.application).get("/shop/p/{}".format(CB["id"]))))
+staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "free_ship_over": ""})
+
+_, cjam = shipping_of([(JS["id"], 1)])
+CALLS.clear()
+lp = body(staff.get("/shop/admin/orders/{}/label".format(cjam)))
+pj = calls("/shipments/")[0][2]["parcels"][0] if calls("/shipments/") else {}
+check("a flat-rate profile's label uses the USPS flat-rate box", pj.get("template") == "USPS_MediumFlatRateBox1" and pj.get("weight") == "48"
+      and "length" not in pj, pj)
+check("...and the label page says which box", "USPS Medium Flat Rate Box (opens on top)" in lp)
+_, cbk = shipping_of([(CB["id"], 1)])
+CALLS.clear()
+lp = body(staff.get("/shop/admin/orders/{}/label".format(cbk)))
+pb = calls("/shipments/")[0][2]["parcels"][0] if calls("/shipments/") else {}
+check("a profile's own box is used when the product has none", (pb.get("length"), pb.get("width"), pb.get("height")) == ("11", "8.5", "2"), pb)
+first = re.search(r'name="rate_0" value="([^"]+)"', lp)
+check("the profile's preferred service (Media Mail) comes first, marked suggested", first and "Media Mail" in first.group(1)
+      and "suggested by the product" in lp, first and first.group(1))
+CALLS.clear()
+staff.get("/shop/admin/orders/{}/label?template=USPS_SmallFlatRateBox&lb=1&oz=8".format(cbk))
+check("staff can switch the box to a flat-rate box on the label page", calls("/shipments/")[0][2]["parcels"][0].get("template") == "USPS_SmallFlatRateBox")
+staff.post("/shop/admin/settings/shipping", data={"shipping_flat": "6", "ship_extra_item": "2", "prof_id": [str(PR["Book"]["id"])],
+                                                 "prof_name_{}".format(PR["Book"]["id"]): "Book", "prof_price_{}".format(PR["Book"]["id"]): "5",
+                                                 "prof_remove_{}".format(PR["Book"]["id"]): "1"})
+check("removing a profile puts its products back on standard shipping", q("SELECT ship_profile_id FROM shop_products WHERE id=?", CB["id"])[0]["ship_profile_id"] is None
+      and "$6 shipping" in body(Client(wsgi.application).get("/shop/p/{}".format(CB["id"]))))
 
 # ---------------------------------------------------------------- the real connection code, against a pretend Shippo
 farm_shippo.call = real_call

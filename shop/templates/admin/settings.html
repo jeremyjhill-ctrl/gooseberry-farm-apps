@@ -10,7 +10,6 @@
   <div class="muted">Each pass bundle also adds its season wording and its own extra terms. The exact wording a buyer agreed to is saved with their order.</div>
   <label>Pick-up instructions (in the receipt email) <textarea name="pickup_note" rows="2">{{ SS.pickup_note }}</textarea></label>
   <div class="grid" style="grid-template-columns:1fr 1fr">
-    <label>Flat shipping per order <input type="text" name="shipping_flat" inputmode="decimal" value="{{ SS.shipping_flat|plain }}"></label>
     <label>Sales tax % <input type="text" name="tax_rate" inputmode="decimal" value="{{ own_tax.value|replace('null', '') if own_tax else '' }}" placeholder="{{ pd_tax }} (same as playdates)"></label>
   </div>
   <div class="muted">Tax applies to taxable items picked up or shipped in Missouri, and to passes. Items shipped out of state aren't taxed. Shipping isn't taxed. Check these rules with your accountant.</div>
@@ -33,6 +32,39 @@
       Events: {% for e in stripe_events %}<span class="code">{{ e }}</span>{{ ', ' if not loop.last }}{% endfor %}</div></details>
   {% endif %}
 </section>
+<form method="post" action="{{ url_for('admin_settings_shipping') }}" class="card" id="shipping">
+  <h2>Shipping</h2>
+  <div class="muted">What buyers pay. An order pays its highest item's shipping in full, plus the add-on for each other item shipped with it.</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+    <label>Standard shipping <input type="text" name="shipping_flat" inputmode="decimal" value="{{ SS.shipping_flat|plain }}"></label>
+    <label>Each extra item adds <input type="text" name="ship_extra_item" inputmode="decimal" value="{{ SS.ship_extra_item|plain }}"></label>
+    <label>Free shipping over <input type="text" name="free_ship_over" inputmode="decimal" value="{{ SS.free_ship_over|plain }}" placeholder="blank = never"></label>
+  </div>
+  <div class="muted">"Standard" is for products with no profile. Free shipping counts the items being shipped (not passes or pickups).</div>
+  <b style="font-size:14px">Shipping profiles</b>
+  {% for pr in profiles %}
+  <div class="profile">
+    <input type="hidden" name="prof_id" value="{{ pr.id }}">
+    <label>Name <input type="text" name="prof_name_{{ pr.id }}" value="{{ pr.name }}"></label>
+    <label>Buyer pays <input type="text" name="prof_price_{{ pr.id }}" inputmode="decimal" value="{{ pr.price|plain }}"></label>
+    <label>Box <select name="prof_template_{{ pr.id }}"><option value="">My own box</option>{% for k, t in templates.items() %}<option value="{{ k }}" {{ 'selected' if pr.template == k }}>{{ t[0] }}</option>{% endfor %}</select></label>
+    <label>Own box, inches <input type="text" name="prof_box_{{ pr.id }}" value="{{ pr.box }}" placeholder="10x8x4"></label>
+    <label>Label service <select name="prof_service_{{ pr.id }}"><option value="">Cheapest</option>{% for k, v in services.items() %}<option value="{{ k }}" {{ 'selected' if pr.service == k }}>{{ v }}</option>{% endfor %}</select></label>
+    <label class="inline"><input type="checkbox" name="prof_remove_{{ pr.id }}" value="1"> <span>Remove</span></label>
+  </div>
+  {% endfor %}
+  <div class="profile new">
+    <label>New profile <input type="text" name="prof_name_new" placeholder="Medium flat-rate box"></label>
+    <label>Buyer pays <input type="text" name="prof_price_new" inputmode="decimal" placeholder="10"></label>
+    <label>Box <select name="prof_template_new"><option value="">My own box</option>{% for k, t in templates.items() %}<option value="{{ k }}">{{ t[0] }}</option>{% endfor %}</select></label>
+    <label>Own box, inches <input type="text" name="prof_box_new" placeholder="10x8x4"></label>
+    <label>Label service <select name="prof_service_new"><option value="">Cheapest</option>{% for k, v in services.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+  </div>
+  <div class="muted">A USPS flat-rate box charges the same anywhere in the country (Priority Mail), so it needs no size. Media Mail is cheap but only for books and other media.</div>
+  <button class="btn">Save shipping</button>
+</form>
+<style>.profile{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 10px;align-items:end;border:1px solid #E3E5DC;border-radius:12px;padding:10px}
+.profile.new{border-style:dashed}</style>
 <form method="post" action="{{ url_for('admin_settings_labels') }}" class="card" id="labels">
   <div class="row between"><h2>Shipping labels</h2>
     <span class="tag {{ {'live': '', 'test': 'amber', 'off': 'grey'}[label_mode] }}">{{ {'live': 'Live', 'test': 'Practice labels', 'off': 'Not set up'}[label_mode] }}</span></div>

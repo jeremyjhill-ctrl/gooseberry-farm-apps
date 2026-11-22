@@ -16,10 +16,10 @@
     {% for para in (p.description or '').split('\n\n') if para %}<p style="margin:0">{{ para }}</p>{% endfor %}
     {% if p.kind == 'pass' %}<p class="muted" style="margin:0">{{ p.season_label }}{% if p.valid_until %} · credits work through {{ nice_day(p.valid_until) }}{% endif %}.</p>
     <p class="muted" style="margin:0"><b>Electronic delivery.</b> Your pass is emailed right after you pay, with a QR code to show at the farm and a code to book playdates online. Buying it as a gift? Add their name at checkout and you'll get a printable gift certificate too.</p>
-    {% elif p.fulfillment == 'ship' %}<p class="muted" style="margin:0">Ships to you. Flat shipping {{ money(SS.shipping_flat) }} per order.</p>
+    {% elif p.fulfillment == 'ship' %}<p class="muted" style="margin:0">Ships to you: {{ money(p.ship_charge) }} shipping{% if SS.ship_extra_item %}, plus {{ money(SS.ship_extra_item) }} for each extra item in the same order{% endif %}.{% if SS.free_ship_over %} Free shipping on {{ money(SS.free_ship_over) }} or more.{% endif %}</p>
     {% elif p.fulfillment == 'pickup' %}<p class="muted" style="margin:0">Pick up at the farm.</p>
     {% elif p.fulfillment == 'none' %}<p class="muted" style="margin:0"><b>Electronic delivery.</b> Nothing to ship or pick up: the details come in your order email.</p>
-    {% elif p.fulfillment == 'both' %}<p class="muted" style="margin:0">We can ship it to you (flat shipping {{ money(SS.shipping_flat) }} per order), or pick it up at the farm for free. You choose at checkout.</p>{% endif %}
+    {% elif p.fulfillment == 'both' %}<p class="muted" style="margin:0">We can ship it to you ({{ money(p.ship_charge) }} shipping{% if SS.free_ship_over %}, free on {{ money(SS.free_ship_over) }} or more{% endif %}), or pick it up at the farm for free. You choose at checkout.</p>{% endif %}
     {% if p.buyable %}
     <form method="post" action="{{ url_for('cart_add') }}" style="display:flex;flex-direction:column;gap:12px">
       <input type="hidden" name="product_id" value="{{ p.id }}">

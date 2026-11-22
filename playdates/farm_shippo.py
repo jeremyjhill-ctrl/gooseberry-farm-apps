@@ -16,6 +16,19 @@ BASE = "https://api.goshippo.com"
 TIMEOUT = 30  # seconds; the server gives a page 60
 
 
+# USPS boxes and envelopes with a fixed price (Shippo parcel templates): name, length, width, height (inches).
+TEMPLATES = {
+    "USPS_FlatRateEnvelope": ("USPS Flat Rate Envelope", 12.5, 9.5, 0.75),
+    "USPS_FlatRatePaddedEnvelope": ("USPS Padded Flat Rate Envelope", 12.5, 9.5, 1.0),
+    "USPS_SmallFlatRateBox": ("USPS Small Flat Rate Box", 8.69, 5.44, 1.75),
+    "USPS_MediumFlatRateBox1": ("USPS Medium Flat Rate Box (opens on top)", 11.25, 8.75, 6.0),
+    "USPS_MediumFlatRateBox2": ("USPS Medium Flat Rate Box (opens on the side)", 14.0, 12.0, 3.5),
+    "USPS_LargeFlatRateBox": ("USPS Large Flat Rate Box", 12.25, 12.25, 6.0),
+}
+# Label services a profile can prefer (shown first on the label page).
+SERVICES = {"usps_media_mail": "USPS Media Mail", "usps_ground_advantage": "USPS Ground Advantage", "usps_priority": "USPS Priority Mail"}
+
+
 class ShippoError(Exception):
     """Something Shippo refused or couldn't do; the message is fit to show staff."""
 
@@ -54,14 +67,17 @@ def messages(obj):
     return " ".join(out)
 
 
-def rates(ship_from, ship_to, weight_oz, box):
-    """Prices for one parcel. box = (length, width, height) in inches. Returns (shipment_id, [rate...]) cheapest first;
-    each rate: id, amount (float), carrier, service, days, terms."""
-    length, width, height = box
-    shipment = call("POST", "/shipments/", {
-        "address_from": ship_from, "address_to": ship_to, "async": False,
-        "parcels": [{"length": "{:g}".format(length), "width": "{:g}".format(width), "height": "{:g}".format(height),
-                     "distance_unit": "in", "weight": "{:g}".format(weight_oz), "mass_unit": "oz"}]})
+def rates(ship_from, ship_to, weight_oz, box, template="", prefer=""):
+    """Prices for one parcel: our own box = (length, width, height) inches, or a USPS flat-rate template.
+    Returns (shipment_id, [rate...]): the preferred service first if there is one, then cheapest first;
+    each rate: id, amount (float), carrier, service, token, days, terms, preferred."""
+    if template:
+        parcel = {"template": template, "weight": "{:g}".format(weight_oz), "mass_unit": "oz"}
+    else:
+        length, width, height = box
+        parcel = {"length": "{:g}".format(length), "width": "{:g}".format(width), "height": "{:g}".format(height),
+                  "distance_unit": "in", "weight": "{:g}".format(weight_oz), "mass_unit": "oz"}
+    shipment = call("POST", "/shipments/", {"address_from": ship_from, "address_to": ship_to, "async": False, "parcels": [parcel]})
     out = []
     for r in shipment.get("rates") or []:
         try:
@@ -70,9 +86,10 @@ def rates(ship_from, ship_to, weight_oz, box):
             continue
         level = r.get("servicelevel") or {}
         out.append({"id": r.get("object_id"), "amount": amount, "carrier": r.get("provider") or "",
-                    "service": level.get("name") or level.get("token") or "", "days": r.get("estimated_days"),
-                    "terms": r.get("duration_terms") or ""})
-    out.sort(key=lambda x: x["amount"])
+                    "service": level.get("name") or level.get("token") or "", "token": level.get("token") or "",
+                    "days": r.get("estimated_days"), "terms": r.get("duration_terms") or "",
+                    "preferred": bool(prefer) and level.get("token") == prefer})
+    out.sort(key=lambda x: (not x["preferred"], x["amount"]))
     if not out:
         raise ShippoError(messages(shipment) or "Shippo found no prices for this package. Check the address, weight and box size.")
     return shipment.get("object_id"), out

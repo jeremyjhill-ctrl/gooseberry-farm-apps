@@ -57,7 +57,8 @@ visible to you while you're logged in, with a banner.
   backing out, a payment made after the hold ran out, Stripe being down, a double-tap opening only one payment page,
   test-buying while the shop is hidden, and the bakery reading Stripe's messages. `STRIPE_REAL=1` uses the real
   Stripe library for the signature checks.
-- `label_test.py`: 53 checks covering shipping labels through Shippo: packed weight and box per product, the return
+- `label_test.py`: 72 checks covering shipping labels through Shippo and shipping profiles (what buyers pay: highest
+  item + an add-on per extra item, free shipping over an amount; flat-rate boxes and Media Mail on labels): packed weight and box per product, the return
   address, prices cheapest first, one tap buying the chosen label (4x6 or plain paper), the order marked shipped and the
   buyer emailed tracking, Print label, void, Shippo refusing or unreachable, a double-tap buying only one label, and
   login checks. Includes the real Shippo connection code against a local pretend Shippo.
