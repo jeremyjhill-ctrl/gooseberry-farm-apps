@@ -1449,9 +1449,11 @@ def create_app():
         weight), nobox (names of items with no box)."""
         out = {"weight": 0.0, "box": None, "template": "", "prefer": "", "missing": [], "nobox": []}
         biggest = 0.0
+        services = set()
         for l in shipping_lines(o):
             p = row("SELECT name, ship_weight_oz, ship_box, ship_profile_id FROM shop_products WHERE id=?", l["product_id"]) or {}
             prof = ship_profile(p.get("ship_profile_id"))
+            services.add((prof or {}).get("service") or "")
             if not p.get("ship_weight_oz"):
                 out["missing"].append(l["name"])
             out["weight"] += float(p.get("ship_weight_oz") or 0) * int(l["qty"])
@@ -1468,7 +1470,10 @@ def create_app():
             size = box[0] * box[1] * box[2]
             if size > biggest:
                 biggest = size
-                out.update(box=box, template=template, prefer=(prof or {}).get("service") or "")
+                out.update(box=box, template=template)
+        # A preferred service only counts when every item in the package prefers it: Media Mail is only allowed when
+        # everything in the box is a book or other media, so a book shipped with a hat must not suggest it.
+        out["prefer"] = services.pop() if len(services) == 1 else ""
         out["weight"] = round(out["weight"], 2) or None
         return out
 
