@@ -81,6 +81,8 @@ def s_create(**kw):
         time.sleep(TROUBLE["slow_create"])
     if TROUBLE["create"]:
         raise StripeError("Stripe is down")
+    if "payment_method_types" in kw:  # like Stripe since 2026: payment methods are chosen in the Dashboard
+        raise StripeError("The `payment_method_types` parameter is no longer supported when creating a Checkout Session.")
     CALLS["create"].append(kw)
     sid = "cs_test_{}".format(len(CALLS["create"]))
     total = sum(x["quantity"] * x["price_data"]["unit_amount"] for x in kw["line_items"])
@@ -221,7 +223,8 @@ def start(email, items=((PASS, 1),), ship=False, who=None):
 s = body(staff.get("/shop/admin/settings"))
 check("Settings shows Stripe test mode", "Stripe test mode" in s and "4242 4242 4242 4242" in s, s[s.find("Card payments"):][:500])
 check("Settings shows the webhook address and events", "/shop/stripe/webhook" in s and "checkout.session.completed" in s
-      and "checkout.session.expired" in s and "set up." in s)
+      and "checkout.session.expired" in s and "checkout.session.async_payment_succeeded" in s
+      and "checkout.session.async_payment_failed" in s and "set up." in s)
 
 # ---------------------------------------------------------------- 1. pay, come back, then Stripe's message arrives
 g1, c1 = start("ann@example.com", items=((PASS, 2), (BOOK, 1)), ship=True)
@@ -233,7 +236,7 @@ check("Stripe is asked for exactly the order total", SESSIONS["cs_test_1"]["amou
       (SESSIONS["cs_test_1"]["amount_total"], o1["total"]))
 names = [x["price_data"]["product_data"]["name"] for x in call.get("line_items", [])]
 check("Stripe's page lists the items, shipping and tax", names == ["Spring Family Pass", "Signed book", "Shipping", "Sales tax"], names)
-check("Stripe call is cards only, in dollars, with the buyer's email", call.get("payment_method_types") == ["card"]
+check("Stripe call leaves payment methods to the Dashboard, in dollars, with the buyer's email", "payment_method_types" not in call
       and all(x["price_data"]["currency"] == "usd" for x in call["line_items"]) and call.get("customer_email") == "ann@example.com")
 check("Stripe knows which order it is", call.get("metadata", {}).get("order") == c1 and call.get("client_reference_id") == c1
       and call["payment_intent_data"]["metadata"]["order"] == c1)
@@ -350,6 +353,17 @@ r = g8.get("/shop/pay/" + c8)
 TROUBLE["create"] = False
 check("if Stripe is down, the buyer is told and nothing is charged", "open the payment page" in body(r)
       and order(c8)["stripe_session"] == "", (body(r)[:300], order(c8)["stripe_session"]))
+check("...without Stripe's technical reason", "Stripe is down" not in body(r))
+gs, cs_ = start("staffer@example.com", who=Client(wsgi.application))
+staff_view = Client(wsgi.application)
+staff_view.post("/shop/admin/login", data={"password": "playdate"})
+TROUBLE["create"] = True
+r = staff_view.get("/shop/pay/" + cs_)
+TROUBLE["create"] = False
+check("staff see Stripe's own reason on that page", "For staff, Stripe said: Stripe is down" in body(r), body(r)[-500:])
+c_ = dbcompat.connect(os.environ["PLAYDATE_DB"], isolation_level=None)
+c_.execute("UPDATE shop_orders SET status='cancelled' WHERE code=?", (cs_,))  # (tidy up: one connection may only hold 3 open checkouts)
+c_.close()
 r = g8.get("/shop/pay/" + c8)
 check("trying again works", loc(r).startswith("https://checkout.stripe.test/") and order(c8)["stripe_session"].startswith("cs_"))
 made = len(CALLS["create"])
@@ -403,6 +417,37 @@ check("staff can test-buy while the shop is hidden", r.status_code == 200 and or
 r = webhook("checkout.session.completed", sidj)
 check("Stripe's messages get through while the shop is hidden", r.status_code == 200)
 staff.post("/shop/admin/visibility", data={"which": "shop", "hidden": "0"})
+
+# ---------------------------------------------------------------- 8b. a payment that takes days to clear (bank payment)
+gb, cb = start("kay@example.com")
+gb.get("/shop/pay/" + cb)
+sidb = order(cb)["stripe_session"]
+SESSIONS[sidb].update(status="complete", payment_status="unpaid", payment_intent="pi_bank")
+made = len(CALLS["create"])
+r = gb.get("/shop/order/{}?session_id={}".format(cb, sidb), follow_redirects=True)
+check("back from Stripe with a bank payment: 'processing', not a second payment page", "payment is processing" in body(r)
+      and len(CALLS["create"]) == made and order(cb)["status"] == "pending", body(r)[:400])
+hold_days = (dt.datetime.fromisoformat(order(cb)["hold_expires"]) - dt.datetime.now(dt.timezone.utc)).days
+check("...its items stay held while it clears", hold_days >= 13 and "still clearing" in (order(cb)["pay_note"] or ""), (hold_days, order(cb)["pay_note"]))
+r = gb.get("/shop/pay/" + cb)
+check("...and going back to pay still doesn't open another page", "payment is processing" in body(r) and len(CALLS["create"]) == made)
+check("...no passes or receipt yet", not passes(cb) and not receipts("kay@example.com"))
+SESSIONS[sidb]["payment_status"] = "paid"
+r = webhook("checkout.session.async_payment_succeeded", sidb)
+check("when the bank payment clears, the order finishes once", r.status_code == 200 and order(cb)["status"] == "paid" and len(passes(cb)) == 1
+      and len(receipts("kay@example.com")) == 1 and "hold ran out" not in (order(cb)["pay_note"] or ""), order(cb))
+webhook("checkout.session.async_payment_succeeded", sidb)
+check("...a repeated message changes nothing", len(passes(cb)) == 1 and len(receipts("kay@example.com")) == 1)
+
+gf, cf = start("lou@example.com")
+gf.get("/shop/pay/" + cf)
+sidf = order(cf)["stripe_session"]
+SESSIONS[sidf].update(status="complete", payment_status="unpaid")
+webhook("checkout.session.completed", sidf)
+check("Stripe's 'completed but not paid yet' message holds the items too", order(cf)["status"] == "pending" and "still clearing" in (order(cf)["pay_note"] or ""))
+webhook("checkout.session.async_payment_failed", sidf)
+check("a bank payment that fails frees the items and says why", order(cf)["status"] == "cancelled" and "didn't go through" in (order(cf)["pay_note"] or "")
+      and not passes(cf))
 
 # ---------------------------------------------------------------- 9. the bakery reads Stripe's messages without crashing
 r = webhook("checkout.session.completed", "cs_test_1", secret=BAKERY_SECRET, path="/bakery/api/stripe/webhook",

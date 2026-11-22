@@ -9,7 +9,8 @@ One program, one server, several storefronts:
   giveaways work the same way. Shares the playdate database (`playdates/farm_passes.py` has the shared rules);
   shares nothing with the bakery. Starts **hidden** from customers (staff can still see and test-buy).
   Card payments: **Stripe Checkout** once `FARM_STRIPE_SECRET_KEY` is set on Render (plus `FARM_STRIPE_WEBHOOK_SECRET`
-  from a Stripe webhook to `/shop/stripe/webhook` for checkout.session.completed and checkout.session.expired; the
+  from a Stripe webhook to `/shop/stripe/webhook` for checkout.session.completed, .expired, .async_payment_succeeded
+  and .async_payment_failed; the
   shop's Settings page shows the exact address). Without a key (as on the Mac) it uses the test card stand-in.
   Shipping labels: **Print a shipping label** on a shipped order, through Shippo, once `SHIPPO_API_KEY` is set
   (shippo_test_ for free practice labels). Return address and label size (4x6 or plain paper) in shop Settings;
@@ -51,7 +52,7 @@ visible to you while you're logged in, with a banner.
 - `login_test.py`: 83 checks covering personal logins: setting up the owner login, adding Staci (playdates + shop) and
   Mollie (bakery only), first-login password change, forgot-password links, turning people off, the shared passwords
   retiring per app, and that Mollie's login pages never show the farm.
-- `stripe_test.py`: 49 checks covering Stripe Checkout against a Stripe stand-in: the payment page and its amounts,
+- `stripe_test.py`: 59 checks covering Stripe Checkout against a Stripe stand-in: the payment page and its amounts,
   the order finishing exactly once whether Stripe's message or the buyer arrives first, forged or replayed messages,
   backing out, a payment made after the hold ran out, Stripe being down, a double-tap opening only one payment page,
   test-buying while the shop is hidden, and the bakery reading Stripe's messages. `STRIPE_REAL=1` uses the real

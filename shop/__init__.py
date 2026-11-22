@@ -58,7 +58,9 @@ TEST_CARD_DECLINE = "4000000000000002"
 HOLD_MINUTES = 30
 STRIPE_PAGE_MINUTES = 35   # how long Stripe's payment page stays open (Stripe allows 30 minutes to 24 hours)
 STRIPE_GRACE_MINUTES = 10  # items stay held this much longer, so a payment made at the last moment still finds its order
-STRIPE_EVENTS = ("checkout.session.completed", "checkout.session.expired")
+STRIPE_EVENTS = ("checkout.session.completed", "checkout.session.expired",
+                 "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed")
+PROCESSING_DAYS = 14       # a bank payment that's still clearing keeps its items held this long
 MAX_PENDING_PER_VISITOR = 3
 MAX_QUESTIONS = 3      # questions for the buyer per product (e.g. how to inscribe a book)
 MAX_ANSWER = 500       # characters per answer
@@ -690,7 +692,22 @@ def create_app():
             return None
         if cs.get("payment_status") == "paid":
             finish_order(o["id"], "stripe", cs.get("payment_intent") or "", cs.get("amount_total"))
+        elif cs.get("status") == "complete":
+            note_processing(o["id"])
         return cs
+
+    def note_processing(oid):
+        """The buyer finished Stripe's page with a payment that takes days to clear (a bank payment): keep their items
+        held while it clears. Stripe's async_payment_succeeded message then finishes the order."""
+        db().execute("UPDATE shop_orders SET hold_expires=?, pay_note=? WHERE id=? AND status='pending'",
+                     ((now() + dt.timedelta(days=PROCESSING_DAYS)).isoformat(),
+                      "Payment is still clearing (a bank payment). The passes and receipt go out when Stripe confirms it.", oid))
+
+    def processing_page(o):
+        return render_template("message.html", title="Your payment is processing",
+                               body="Thanks, {}! Your bank payment is on its way, which can take a few business days. "
+                                    "We'll email your receipt{} as soon as it clears.".format(
+                                        o["name"].split(" ")[0], " and passes" if any(l["kind"] == "pass" for l in o["lines"]) else ""))
 
     def stripe_lines(o):
         items = []
@@ -720,6 +737,8 @@ def create_app():
             return redirect(url_for("order", code=o["code"]))
         if cs and cs.get("status") == "open" and cs.get("url"):
             return redirect(cs["url"])  # their payment page is still open: back to it, never a second one
+        if cs and cs.get("status") == "complete" and o["status"] == "pending":
+            return processing_page(o)  # paid with something that takes days to clear: never a second payment page
         if o["status"] != "pending":
             return timed_out()
         if (o.get("stripe_session") or "").startswith("cs_") and cs is None:
@@ -750,7 +769,6 @@ def create_app():
             cs = sdict(stripe.checkout.Session.create(
                 api_key=stripe_key,
                 mode="payment",
-                payment_method_types=["card"],  # cards, Apple Pay and Google Pay: paid on the spot, nothing to wait on
                 customer_email=o["email"],
                 client_reference_id=o["code"],
                 line_items=stripe_lines(o),
@@ -761,10 +779,10 @@ def create_app():
                 success_url=url_for("order", code=o["code"], _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
                 cancel_url=url_for("pay_cancelled", code=o["code"], _external=True),
             ))
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             app.logger.exception("Stripe checkout failed for order %s", o["code"])
             db().execute("UPDATE shop_orders SET stripe_session=? WHERE id=? AND stripe_session=?", (old, o["id"], mine))
-            return could_not_start(o)
+            return could_not_start(o, getattr(e, "user_message", None) or str(e))
         held = (page_ends + dt.timedelta(minutes=STRIPE_GRACE_MINUTES)).isoformat()
         db().execute("UPDATE shop_orders SET stripe_session=?, hold_expires=? WHERE id=?", (cs["id"], held, o["id"]))
         return redirect(cs["url"])
@@ -774,9 +792,11 @@ def create_app():
                                body="We held your items for {} minutes and they've been put back. You weren't charged.".format(HOLD_MINUTES),
                                link=url_for("cart_view"), link_text="Back to my cart")
 
-    def could_not_start(o):
-        return render_template("message.html", title="We couldn't open the payment page",
-                               body="Nothing was charged. Please try again in a minute.",
+    def could_not_start(o, reason=""):
+        body = "Nothing was charged. Please try again in a minute."
+        if reason and is_admin():  # staff see Stripe's own reason; customers don't
+            body += "\n\nFor staff, Stripe said: " + str(reason)[:600]
+        return render_template("message.html", title="We couldn't open the payment page", body=body,
                                link=url_for("pay", code=o["code"]), link_text="Try again")
 
     @app.route("/pay/<code>", methods=["GET", "POST"])
@@ -820,7 +840,7 @@ def create_app():
 
     @app.post("/stripe/webhook")
     def stripe_webhook():
-        """Stripe's messages about the farm's payment pages. Set it up in Stripe for the two STRIPE_EVENTS."""
+        """Stripe's messages about the farm's payment pages. Set it up in Stripe for the four STRIPE_EVENTS."""
         if not stripe or not webhook_secret:
             return "Stripe isn't set up on this server.", 400
         try:
@@ -832,8 +852,14 @@ def create_app():
         o = row("SELECT * FROM shop_orders WHERE code=?", code) if code else None
         if not o:
             return {"received": True, "note": "not a farm shop order"}
-        if event.get("type") == "checkout.session.completed" and cs.get("payment_status") == "paid":
+        kind = event.get("type")
+        if kind in ("checkout.session.completed", "checkout.session.async_payment_succeeded") and cs.get("payment_status") == "paid":
             finish_order(o["id"], "stripe", cs.get("payment_intent") or "", cs.get("amount_total"))
+        elif kind == "checkout.session.completed":
+            note_processing(o["id"])
+        elif kind == "checkout.session.async_payment_failed" and o["status"] == "pending":
+            db().execute("UPDATE shop_orders SET status='cancelled', hold_expires=NULL, pay_note=? WHERE id=? AND status='pending'",
+                         ("The buyer's bank payment didn't go through, so nothing was paid and the items went back on sale.", o["id"]))
         elif event.get("type") == "checkout.session.expired" and o["status"] == "pending" and o.get("stripe_session") == cs.get("id"):
             db().execute("UPDATE shop_orders SET status='expired', hold_expires=NULL WHERE id=? AND status='pending'", (o["id"],))
         return {"received": True}
