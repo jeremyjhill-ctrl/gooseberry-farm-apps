@@ -520,6 +520,34 @@ check("settings save", r.status_code == 302 and json.loads(q("SELECT value FROM 
 check("playdate admin links to the shop", "/shop/admin" in body(c.get("/admin")))
 check("bakery untouched", Client(wsgi.application).get("/bakery/").status_code == 200)
 
+# ---------------------------------------------------------------- staff adjust any credit on a pass
+r = c.post("/shop/admin/passes/new", data={"title": "Adjust me", "cq_0": "1", "ct_0": str(PLAY), "cq_1": "5", "ct_1": str(EXTRA)})
+A = q("SELECT code FROM shop_passes WHERE title='Adjust me'")[0]["code"]
+page_ = body(c.get("/shop/pass/" + A))
+check("staff see Adjust credits on a pass", "Adjust credits" in page_ and 'name="left_{}"'.format(PLAY) in page_ and 'name="add_type"' in page_)
+check("customers don't", "Adjust credits" not in body(guest.get("/shop/pass/" + A)))
+r = c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "0", "left_{}".format(EXTRA): "5", "reason": ""})
+check("a reason is required", left(A, PLAY) == 1)
+c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "0", "left_{}".format(EXTRA): "5", "reason": "Booked by phone for May 2"})
+check("staff mark a booking-only playdate used", left(A, PLAY) == 0 and left(A, EXTRA) == 5, (left(A, PLAY), left(A, EXTRA)))
+h = body(c.get("/shop/pass/" + A))
+check("...and the history says so", "adjusted: Booked by phone for May 2" in h)
+c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "1", "left_{}".format(EXTRA): "7", "reason": "Goodwill"})
+cr = {x["credit_type_id"]: x for x in q("SELECT credit_type_id, SUM(qty) AS qty FROM shop_pass_credits WHERE pass_id=(SELECT id FROM shop_passes WHERE code=?) GROUP BY credit_type_id", A)}
+check("raising gives back used credits first, then adds more", left(A, PLAY) == 1 and left(A, EXTRA) == 7
+      and int(cr[PLAY]["qty"]) == 1 and int(cr[EXTRA]["qty"]) == 7, (left(A, PLAY), left(A, EXTRA), cr))
+c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "1", "left_{}".format(EXTRA): "7", "add_type": str(FLOWER), "add_qty": "2",
+                                               "reason": "Thank-you for helping at the event"})
+check("staff add a credit the pass didn't have", left(A, FLOWER) == 2)
+h = body(c.get("/shop/pass/" + A))
+check("...shown in the history", "added 2: Thank-you for helping at the event" in h)
+r = guest.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "9", "reason": "hack"})
+check("customers can't adjust", left(A, PLAY) == 1 and r.status_code in (302, 303))
+c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "-4", "reason": "typo"})
+check("a count can't go below zero", left(A, PLAY) == 0)
+c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "1", "reason": "undo typo"})
+check("a playdate given back can be booked online again", left(A, PLAY) == 1)
+
 summary = {"database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite", "passed": len(results) - len(failures),
            "total": len(results), "failures": failures}
 print(json.dumps(summary, indent=1))

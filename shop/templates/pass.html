@@ -40,11 +40,27 @@
   <h3>History</h3>
   {% for u in history %}
   <div class="row between" style="font-size:14px;border-top:1px solid #EFE2B8;padding-top:6px">
-    <span>{{ u.created_at[:16].replace('T', ' ') }} · {% if u.qty > 0 %}used {{ u.qty }}{% else %}{{ -u.qty }} back{% endif %} × {{ u.credit_name }}
-      {% if u.where_used == 'booking' and u.booking_code %}· playdate {{ u.booking_date }}{% elif u.where_used == 'farm' %}· at the farm{% elif u.note %}· {{ u.note }}{% endif %}{% if u.by_whom %} ({{ u.by_whom }}){% endif %}</span>
+    <span>{{ u.created_at[:16].replace('T', ' ') }} · {% if u.where_used == 'added' %}{{ u.credit_name }}: {{ u.note }}{% else %}{% if u.qty > 0 %}used {{ u.qty }}{% else %}{{ -u.qty }} back{% endif %} × {{ u.credit_name }}
+      {% if u.where_used == 'booking' and u.booking_code %}· playdate {{ u.booking_date }}{% elif u.where_used == 'farm' %}· at the farm{% elif u.where_used == 'adjust' %}· adjusted: {{ u.note }}{% elif u.note %}· {{ u.note }}{% endif %}{% endif %}{% if u.by_whom %} ({{ u.by_whom }}){% endif %}</span>
     {% if u.where_used == 'farm' %}<form method="post" action="{{ url_for('pass_undo', code=p.code, use_id=u.id) }}"><button class="linkbtn">Undo</button></form>{% endif %}
   </div>
   {% else %}<p class="muted" style="margin:0">Not used yet.</p>{% endfor %}
+  <details id="adjust"><summary style="font-weight:700;cursor:pointer">Adjust credits</summary>
+  <form method="post" action="{{ url_for('pass_adjust', code=p.code) }}" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+    <div class="muted">Set how many of each are left, for example a playdate you booked for them by phone, a mistake, or a goodwill extra. Lowering a number counts the difference as used; raising it gives credits back.</div>
+    {% for c in credits %}
+    <label style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;font-weight:400"><span><b>{{ c.name }}</b><br><span class="muted">{{ c.left }} of {{ c.qty }} left now</span></span>
+      <input type="number" name="left_{{ c.credit_type_id }}" value="{{ c.left }}" min="0" max="99" step="1" inputmode="numeric" style="width:80px;flex:none"></label>
+    {% endfor %}
+    {% set have = credits|map(attribute='credit_type_id')|list %}{% set others = all_types|rejectattr('id', 'in', have)|list %}
+    {% if others %}
+    <div class="row" style="gap:8px;flex-wrap:wrap"><span><b>Add</b></span>
+      <input type="number" name="add_qty" min="0" max="99" step="1" inputmode="numeric" placeholder="0" style="width:80px" aria-label="How many to add">
+      <select name="add_type" aria-label="Which credit">{% for t in others %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+    {% endif %}
+    <label>Why (saved in the history) <input type="text" name="reason" maxlength="200" placeholder="Booked them by phone for Sat May 2" required></label>
+    <button class="btn ghost">Save changes</button>
+  </form></details>
   <details><summary style="font-weight:700;cursor:pointer">Edit this pass</summary>
   <form method="post" action="{{ url_for('pass_edit', code=p.code) }}" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
     <label>Bought by <input type="text" name="holder" value="{{ p.holder }}"></label>

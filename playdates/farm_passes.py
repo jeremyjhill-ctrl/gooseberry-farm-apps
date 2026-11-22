@@ -455,6 +455,55 @@ def undo_use(con, p, use_id, by_whom):
     return ""
 
 
+def adjust_credits(con, p, wanted, reason, by_whom, add_type=None, add_qty=0):
+    """Staff set how many of each credit a pass has left (any credit, including playdates booked by hand), and can add
+    a credit the pass didn't come with. Lowering records the difference as used; raising gives used credits back first,
+    then adds more to the pass. Every change goes in the history with who and why. Returns (what changed, error)."""
+    reason = (reason or "").strip()[:200]
+    if not reason:
+        return [], "Please say why (it's saved in the pass's history)."
+    now_ = stamp()
+    current = {c["credit_type_id"]: c for c in credits(con, p["id"])}
+    if add_type:
+        add_type, add_qty = int(add_type), max(0, min(99, int(add_qty or 0)))
+        if add_qty and add_type in current:
+            wanted[add_type] = max(wanted.get(add_type, current[add_type]["left"]), current[add_type]["left"]) + add_qty
+        elif add_qty:
+            t = con.execute("SELECT id, name FROM shop_credit_types WHERE id=?", (add_type,)).fetchone()
+            if not t:
+                return [], "That kind of credit doesn't exist."
+            con.execute("INSERT INTO shop_pass_credits(pass_id, credit_type_id, name, qty) VALUES (?,?,?,?)", (p["id"], t["id"], t["name"], add_qty))
+            con.execute("INSERT INTO shop_pass_uses(pass_id, credit_type_id, qty, where_used, by_whom, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                        (p["id"], t["id"], 0, "added", by_whom, "added {}: {}".format(add_qty, reason), now_))
+    changed = []
+    for ct, new_left in wanted.items():
+        c = current.get(int(ct))
+        if not c:
+            continue
+        new_left = max(0, min(99, int(new_left)))
+        delta = new_left - c["left"]
+        if not delta:
+            continue
+        if delta < 0:  # fewer left: the difference counts as used
+            con.execute("INSERT INTO shop_pass_uses(pass_id, credit_type_id, qty, where_used, by_whom, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                        (p["id"], c["credit_type_id"], -delta, "adjust", by_whom, reason, now_))
+        else:
+            back = min(delta, max(0, c["used"]))  # give used credits back first...
+            if back:
+                con.execute("INSERT INTO shop_pass_uses(pass_id, credit_type_id, qty, where_used, by_whom, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                            (p["id"], c["credit_type_id"], -back, "adjust", by_whom, reason, now_))
+            extra = delta - back  # ...then add more than the pass came with
+            if extra:
+                con.execute("INSERT INTO shop_pass_credits(pass_id, credit_type_id, name, qty) VALUES (?,?,?,?)",
+                            (p["id"], c["credit_type_id"], c["name"], extra))
+                con.execute("INSERT INTO shop_pass_uses(pass_id, credit_type_id, qty, where_used, by_whom, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                            (p["id"], c["credit_type_id"], 0, "added", by_whom, "added {}: {}".format(extra, reason), now_))
+        changed.append("{}: {} left (was {})".format(c["name"], new_left, c["left"]))
+    if add_type and add_qty and add_type not in current:
+        changed.append("added {} credit{}".format(add_qty, "s" if add_qty != 1 else ""))
+    return changed, ""
+
+
 # ---------------------------------------------------------------- making passes
 
 def create_pass(con, title, credit_rows, holder="", gift_for="", email="", season_label="", valid_until="",

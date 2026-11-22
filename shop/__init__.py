@@ -916,6 +916,7 @@ def create_app():
         cr = fp.credits(con, p["id"])
         can_book = any(c["booking_role"] and c["left"] > 0 and c["available"] for c in cr)
         return render_template("pass.html", p=p, credits=cr, history=fp.history(con, p["id"]) if is_admin() else [],
+                               all_types=credit_types() if is_admin() else [],
                                problem=fp.pass_problem(p), can_book=can_book,
                                qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
 
@@ -947,6 +948,37 @@ def create_app():
         con.execute("ROLLBACK" if err else "COMMIT")
         flash(err or "Undone: the credit is back on the pass.")
         return redirect(url_for("pass_page", code=p["code"]))
+
+    def staff_name():
+        u = fa.current_user(request)
+        return ((u.get("name") or u.get("email")) if u else "") or "staff"
+
+    @app.post("/pass/<code>/adjust")
+    @admin_required
+    def pass_adjust(code):
+        """Set any credit's count on a pass (a playdate booked by phone, a mistake, a goodwill extra), logged with who and why."""
+        p = pass_or_404(code)
+        f = request.form
+        wanted = {}
+        for c in fp.credits(db(), p["id"]):
+            v = f.get("left_{}".format(c["credit_type_id"]), "").strip()
+            if v != "":
+                try:
+                    wanted[c["credit_type_id"]] = int(v)
+                except ValueError:
+                    flash("Counts should be whole numbers.")
+                    return redirect(url_for("pass_page", code=p["code"]) + "#adjust")
+        con = db()
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            changed, err = fp.adjust_credits(con, p, wanted, f.get("reason", ""), staff_name(),
+                                             add_type=f.get("add_type", type=int), add_qty=f.get("add_qty", 0, type=int) or 0)
+            con.execute("ROLLBACK" if err or not changed else "COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+        flash(err or ("Saved: " + "; ".join(changed) + "." if changed else "Nothing changed."))
+        return redirect(url_for("pass_page", code=p["code"]) + ("#adjust" if err else ""))
 
     @app.post("/pass/<code>/edit")
     @admin_required
