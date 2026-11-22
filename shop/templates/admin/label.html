@@ -10,6 +10,7 @@
   <div class="warn" role="alert">{{ problem }}</div>
   {% else %}
   {% if labels %}<div class="warn" role="alert">This order already has a label. Only buy another if you're sending a second box.</div>{% endif %}
+  {% if profiles %}<div class="muted">Shipping profile{{ 's' if profiles|length > 1 }}: {{ profiles|join('; ') }}</div>{% endif %}
   {% if missing %}<div class="muted">Add a packed weight to <b>{{ missing|join(', ') }}</b> (on the product) and this fills itself in next time.</div>{% endif %}
   {% if nobox %}<div class="muted"><b>{{ nobox|join(', ') }}</b> {{ 'has' if nobox|length == 1 else 'have' }} no box yet: give the product a shipping profile or its own box size.</div>{% endif %}
   <form method="get" class="pkg" data-no-lock>

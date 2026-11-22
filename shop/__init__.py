@@ -82,7 +82,7 @@ DEFAULT_SETTINGS = {
     "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
     "email_daily_limit": farm_mail.DEFAULT_DAILY_LIMIT,  # leaves room in Resend's free 100 a day for Pasture Keeper
     "ship_from": {"name": "Gooseberry Bridge Farm", "street1": "", "street2": "", "city": "Rogersville", "state": "MO",
-                  "zip": "", "phone": ""},  # the return address on shipping labels
+                  "zip": "", "phone": "", "email": ""},  # the return address on shipping labels (email: Shippo requires one)
     "label_size": "PDF_4x6",   # PDF_4x6 for a 4x6 label printer, PDF for plain 8.5x11 paper
 }
 LABEL_SIZES = {"PDF_4x6": "4×6 label printer", "PDF": "Plain paper (8.5×11)"}
@@ -1447,13 +1447,16 @@ def create_app():
         else its shipping profile's box or USPS flat-rate box). Returns dict: weight (oz or None), box (L,W,H or None),
         template ('' or a USPS flat-rate token), prefer (a preferred label service or ''), missing (names of items with no
         weight), nobox (names of items with no box)."""
-        out = {"weight": 0.0, "box": None, "template": "", "prefer": "", "missing": [], "nobox": []}
+        out = {"weight": 0.0, "box": None, "template": "", "prefer": "", "missing": [], "nobox": [], "profiles": []}
         biggest = 0.0
         services = set()
         for l in shipping_lines(o):
             p = row("SELECT name, ship_weight_oz, ship_box, ship_profile_id FROM shop_products WHERE id=?", l["product_id"]) or {}
             prof = ship_profile(p.get("ship_profile_id"))
             services.add((prof or {}).get("service") or "")
+            name = "{}: {}".format(l["name"], prof["name"] if prof else "standard shipping (no profile)")
+            if name not in out["profiles"]:
+                out["profiles"].append(name)
             if not p.get("ship_weight_oz"):
                 out["missing"].append(l["name"])
             out["weight"] += float(p.get("ship_weight_oz") or 0) * int(l["qty"])
@@ -1484,14 +1487,23 @@ def create_app():
             a["phone"] = o["phone"]
         return a
 
+    def farm_email():
+        """The farm's own email address, from the email setup (PLAYDATE_MAIL_FROM, e.g. "Farm <hello@...>")."""
+        m = re.search(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", os.environ.get("PLAYDATE_MAIL_FROM", ""))
+        return m.group(0) if m else ""
+
     def ship_from():
         s = settings()["ship_from"] or {}
-        return dict({k: (s.get(k) or "") for k in ("name", "street1", "street2", "city", "state", "zip", "phone")}, country="US")
+        out = dict({k: (s.get(k) or "") for k in ("name", "street1", "street2", "city", "state", "zip", "phone", "email")}, country="US")
+        out["email"] = out["email"] or farm_email()  # Shippo won't buy a label without the sender's email
+        return out
 
     def ship_from_problem():
         s = ship_from()
         if not (s["street1"] and s["city"] and s["state"] and s["zip"]):
             return "Add the farm's return address in Settings > Shipping labels first."
+        if not s["email"]:
+            return "Add the farm's email to the return address in Settings > Shipping labels first (Shippo requires one)."
         return ""
 
     def label_ready(o):
@@ -1530,6 +1542,7 @@ def create_app():
                 error = str(e)
         return render_template("admin/label.html", o=o, problem=problem, rates=rates, error=error, weight=weight, box=box,
                                template=template, templates=farm_shippo.TEMPLATES, missing=guess["missing"], nobox=guess["nobox"],
+                               profiles=guess["profiles"],
                                labels=[x for x in order_labels(o) if x["status"] == "bought"],
                                box_text="x".join("{:g}".format(d) for d in box) if box and not template else "",
                                label_mode=farm_shippo.mode(), label_size=LABEL_SIZES.get(settings()["label_size"], ""))
@@ -1681,7 +1694,7 @@ def create_app():
     @admin_required
     def admin_settings_labels():
         f = request.form
-        save_setting("ship_from", {k: f.get("from_" + k, "").strip()[:100] for k in ("name", "street1", "street2", "city", "state", "zip", "phone")})
+        save_setting("ship_from", {k: f.get("from_" + k, "").strip()[:100] for k in ("name", "street1", "street2", "city", "state", "zip", "phone", "email")})
         if f.get("label_size") in LABEL_SIZES:
             save_setting("label_size", f["label_size"])
         flash("Shipping label settings saved.")
@@ -1781,7 +1794,7 @@ def create_app():
                                stripe_mode=stripe_mode, stripe_webhook_set=bool(webhook_secret), stripe_events=STRIPE_EVENTS,
                                webhook_url=url_for("stripe_webhook", _external=True),
                                label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES, profiles=ship_profiles(),
-                               templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES)
+                               templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES, farm_email=farm_email())
 
     @app.post("/admin/settings/email")
     @admin_required

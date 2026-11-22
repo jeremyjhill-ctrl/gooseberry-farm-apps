@@ -21,7 +21,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 work = tempfile.mkdtemp(prefix="label-test-")
 os.environ.update(PLAYDATE_DB=os.path.join(work, "p.db"), FARM_DATA_DIR=work, FARM_TEST_MODE="1",
-                  MAIL_PROVIDER="memory", PLAYDATE_EMAILS="on", ADMIN_PASSWORD="playdate", SHIPPO_API_KEY="shippo_test_standin")
+                  MAIL_PROVIDER="memory", PLAYDATE_EMAILS="on", ADMIN_PASSWORD="playdate", SHIPPO_API_KEY="shippo_test_standin",
+                  PLAYDATE_MAIL_FROM="Gooseberry Bridge Farm <hello@gooseberrybridge.com>")
 os.environ.pop("FARM_STRIPE_SECRET_KEY", None)
 if os.environ.get("DATABASE_URL"):
     os.environ["FARM_DB_NAME"] = "labeltest_" + os.path.basename(work).replace("-", "_").lower()
@@ -179,6 +180,8 @@ check("the package is 2 hats' weight in the hat box", parcel.get("weight") == "1
 check("it ships to the buyer's address", shp.get("address_to", {}).get("street1") == "12 Elm St" and shp["address_to"]["zip"] == "65802"
       and shp["address_to"]["name"] == "Pat Buyer" and shp["address_to"]["country"] == "US")
 check("from the farm's return address", shp.get("address_from", {}).get("street1") == "100 Farm Rd" and shp["address_from"]["zip"] == "65742")
+check("the sender has an email (Shippo requires one): the farm's own when left blank", shp["address_from"].get("email") == "hello@gooseberrybridge.com", shp["address_from"])
+check("the label page names each item's shipping profile", "Shipping profile" in lp and "standard shipping (no profile)" in lp)
 check("prices are shown cheapest first", lp.find("Ground Advantage") < lp.find("Priority Mail") and "$5.62" in lp and "$9.85" in lp
       and "cheapest" in lp)
 check("a price Shippo sent without an amount is left out", "rate_bad" not in lp)
@@ -220,6 +223,17 @@ LX = labels(cX)
 rid1, amt1, car1, svc1 = picks["rate_1"].split("|")
 check("pressing the second Buy buys that price, recorded right", LX and calls("/transactions/", "POST")[-1][2]["rate"] == rid1
       and LX[0]["cost"] == float(amt1) and LX[0]["service"] == svc1 and LX[0]["weight_oz"] == 36 and LX[0]["box"] == "12x9x3", (picks, LX))
+
+os.environ["PLAYDATE_MAIL_FROM"] = ""
+o_ = body(staff.get("/shop/admin/orders/" + c1))
+check("with no email anywhere, it asks for one before trying", "requires one" in o_ and "Print a shipping label" not in o_)
+staff.post("/shop/admin/settings/labels", data={"from_name": "Gooseberry Bridge Farm", "from_street1": "100 Farm Rd", "from_city": "Rogersville",
+                                                "from_state": "MO", "from_zip": "65742", "from_phone": "4175550199", "from_email": "ship@example.com",
+                                                "label_size": "PDF_4x6"})
+CALLS.clear()
+staff.get("/shop/admin/orders/{}/label?lb=1&box=8x8x8".format(c1))
+check("an email typed in Settings is used", calls("/shipments/") and calls("/shipments/")[0][2]["address_from"]["email"] == "ship@example.com")
+os.environ["PLAYDATE_MAIL_FROM"] = "Gooseberry Bridge Farm <hello@gooseberrybridge.com>"
 
 # ---------------------------------------------------------------- void
 CALLS.clear()

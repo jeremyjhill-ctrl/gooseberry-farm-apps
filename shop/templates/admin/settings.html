@@ -81,7 +81,11 @@
     <label>State <input type="text" name="from_state" value="{{ sf.state or '' }}" maxlength="2"></label>
     <label>ZIP <input type="text" name="from_zip" value="{{ sf.zip or '' }}" inputmode="numeric"></label>
   </div>
-  <label style="max-width:340px">Phone <input type="tel" name="from_phone" value="{{ sf.phone or '' }}"></label>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+    <label>Phone <input type="tel" name="from_phone" value="{{ sf.phone or '' }}"></label>
+    <label>Email <input type="email" name="from_email" value="{{ sf.email or '' }}" placeholder="{{ farm_email or 'hello@gooseberrybridge.com' }}"></label>
+  </div>
+  <div class="muted">Shippo needs an email for the sender.{% if farm_email %} Leave it blank to use {{ farm_email }}.{% endif %}</div>
   <label style="max-width:340px">Labels print on <select name="label_size">{% for k, v in label_sizes.items() %}<option value="{{ k }}" {{ 'selected' if SS.label_size == k }}>{{ v }}</option>{% endfor %}</select></label>
   <button class="btn">Save label settings</button>
 </form>
