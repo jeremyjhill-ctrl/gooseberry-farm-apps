@@ -267,11 +267,28 @@
 
   // ---------- Mollie's side ----------
   // One entry point for every admin change, so the server and the demo share it.
+  // Each sale remembers its own menu (mirrors store.py; Nov 23, 2026).
+  function rememberMenu(state) {
+    const s = state.settings;
+    s.saleMenus = s.saleMenus || {};
+    s.saleMenus[s.season] = state.items.filter((i) => i.active).map((i) => i.id);
+  }
+  function switchSale(state, old, nu, startFrom) {
+    const menus = (state.settings.saleMenus = state.settings.saleMenus || {});
+    menus[old] = state.items.filter((i) => i.active).map((i) => i.id);
+    const use = (ids) => state.items.forEach((i) => { i.active = ids.includes(i.id); });
+    if (nu in menus) use(menus[nu]);
+    else if (startFrom === 'none') use([]);
+    else if (startFrom in menus) use(menus[startFrom]);
+    menus[nu] = state.items.filter((i) => i.active).map((i) => i.id);
+  }
+
   function adminAction(state, a, now) {
     const s = state.settings;
     switch (a.action) {
       case 'saveSettings': {
         const v = a.settings || {};
+        const oldSale = s.season || 'Orders';
         for (const k of ['shopName', 'season', 'tagline', 'intro', 'dietaryNote', 'contactEmail', 'contactNote', 'allergyPrompt', 'thankYouNote', 'appPayNote'])
           if (k in v) s[k] = clean(v[k], 1000);
         for (const k of ['venmo', 'cashapp', 'paypal']) if (k in v) s[k] = clean(v[k], 80).replace(/\s+/g, '');
@@ -282,6 +299,14 @@
         if ('perOrderMax' in v) s.perOrderMax = Math.min(99, Math.max(1, toInt(v.perOrderMax) || 12));
         if (!s.shopName) s.shopName = 'Bakery';
         if (!s.season) s.season = 'Orders';
+        if (s.season !== oldSale) switchSale(state, oldSale, s.season, clean(v.menuStartFrom || '', 120));
+        return {};
+      }
+      case 'toggleItem': {
+        const item = state.items.find((i) => i.id === a.id);
+        if (!item) throw userError('That item wasn’t found.');
+        item.active = !!a.on;
+        rememberMenu(state);
         return {};
       }
       case 'saveItem': {
@@ -300,11 +325,15 @@
         item.limit = optInt(v.limit);
         if ('active' in v) item.active = !!v.active;
         if ('image' in v) item.image = v.image || '';
+        rememberMenu(state);
         return { id: item.id };
       }
-      case 'deleteItem':
+      case 'deleteItem': {
         state.items = state.items.filter((i) => i.id !== a.id);
+        const menus = state.settings.saleMenus || {};
+        for (const k of Object.keys(menus)) menus[k] = menus[k].filter((x) => x !== a.id);
         return {};
+      }
       case 'moveItem':
       case 'movePickup': {
         const list = a.action === 'moveItem' ? state.items : state.pickups;

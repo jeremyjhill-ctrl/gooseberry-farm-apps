@@ -467,6 +467,47 @@ def public_order(o, s=None):
     return out
 
 
+# ---------------------------------------------------------------- each sale remembers its own menu
+# The Menu is everything Mollie makes; an item's "active" means it's in the current sale. settings.saleMenus remembers
+# which items were in each sale (by sale name), so starting Christmas doesn't lose Thanksgiving's picks, and going
+# back to a sale's name brings its menu back. Added Nov 23, 2026.
+
+def sale_menus(state, sale=None):
+    """settings.saleMenus, making sure the given sale (default: the current one) has an entry."""
+    s = state["settings"]
+    menus = s.setdefault("saleMenus", {})
+    sale = sale if sale is not None else s.get("season")
+    if sale and sale not in menus:
+        menus[sale] = [i["id"] for i in state["items"] if i.get("active")]
+    return menus
+
+
+def remember_menu(state):
+    """Records the current sale's picks (after any item is switched on or off, added or edited)."""
+    sale_menus(state)[state["settings"]["season"]] = [i["id"] for i in state["items"] if i.get("active")]
+
+
+def use_menu(state, ids):
+    keep = set(ids)
+    for i in state["items"]:
+        i["active"] = i["id"] in keep
+
+
+def switch_sale(state, old, new, start_from):
+    """The sale name changed from old to new: keep the old sale's picks, then show the new sale's own menu if it has
+    one; otherwise start it from another sale's picks (start_from: a sale name), from nothing ("none"), or as it is
+    now (anything else)."""
+    menus = state["settings"].setdefault("saleMenus", {})
+    menus[old] = [i["id"] for i in state["items"] if i.get("active")]
+    if new in menus:
+        use_menu(state, menus[new])
+    elif start_from == "none":
+        use_menu(state, [])
+    elif start_from in menus:
+        use_menu(state, menus[start_from])
+    menus[new] = [i["id"] for i in state["items"] if i.get("active")]
+
+
 # ---------------------------------------------------------------- Mollie's side
 
 def admin_action(state, a, now):
@@ -475,6 +516,7 @@ def admin_action(state, a, now):
     action = a.get("action")
     if action == "saveSettings":
         v = a.get("settings") or {}
+        old_sale = s.get("season") or "Orders"
         for k in ["shopName", "season", "tagline", "intro", "dietaryNote", "contactEmail", "contactNote",
                   "allergyPrompt", "thankYouNote", "appPayNote"]:
             if k in v:
@@ -500,6 +542,16 @@ def admin_action(state, a, now):
             s["shopName"] = "Bakery"
         if not s.get("season"):
             s["season"] = "Orders"
+        if s["season"] != old_sale:
+            switch_sale(state, old_sale, s["season"], clean(v.get("menuStartFrom"), 120))
+        return {}
+
+    if action == "toggleItem":  # the "In this sale" switch on the Menu list
+        item = next((i for i in state["items"] if i["id"] == a.get("id")), None)
+        if not item:
+            raise UserError("That item wasn't found.")
+        item["active"] = bool(a.get("on"))
+        remember_menu(state)
         return {}
 
     if action == "saveItem":
@@ -527,10 +579,14 @@ def admin_action(state, a, now):
             item["active"] = bool(v["active"])
         if "image" in v:
             item["image"] = v["image"] or ""
+        remember_menu(state)
         return {"id": item["id"]}
 
     if action == "deleteItem":
         state["items"] = [i for i in state["items"] if i["id"] != a.get("id")]
+        menus = sale_menus(state)
+        for sale in list(menus):
+            menus[sale] = [x for x in menus[sale] if x != a.get("id")]
         return {}
 
     if action in ("moveItem", "movePickup"):

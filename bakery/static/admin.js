@@ -115,7 +115,7 @@ window.Admin = (function () {
         <label class="field"><span>Price ($)</span><input type="number" name="price" inputmode="decimal" step="0.01" min="0.5" value="${d.price}" required /></label>
         <label class="field"><span>How many can you make?</span><input type="number" name="limit" inputmode="numeric" min="0" step="1" value="${d.limit == null ? '' : d.limit}" placeholder="No limit" /><small>Leave blank for no limit. It shows "sold out" when they're gone.</small></label>
       </div>
-      <label class="switch"><input type="checkbox" name="active" ${d.active ? 'checked' : ''} /> Show on the shop</label>
+      <label class="switch"><input type="checkbox" name="active" ${d.active ? 'checked' : ''} /> In this sale (${h(st.settings.season)})</label>
       ${editorButtons(d.id)}
     </form>`;
   }
@@ -172,20 +172,31 @@ window.Admin = (function () {
       ${id ? `<button class="btn link" type="button" data-delete="${id}" style="color:var(--danger)">${armed === id ? 'Tap again to delete' : 'Delete'}</button>` : ''}</div>`;
   }
 
+  // The last earlier sale an item was in (each sale remembers its own menu).
+  function lastSaleOf(id) {
+    const menus = st.settings.saleMenus || {};
+    const past = Object.keys(menus).filter((k) => k !== st.settings.season && (menus[k] || []).includes(id));
+    return past.length ? past[past.length - 1] : '';
+  }
+
   function menuTab() {
+    const sale = st.settings.season;
+    const inSale = st.items.filter((i) => i.active).length;
     const rows = st.items
       .map((i, idx) => {
         if (editing && editing.kind === 'item' && editing.id === i.id) return itemEditor(editing.draft);
         const left = st.stock[i.id];
-        return `<div class="item-row"><div class="mover"><button data-move-item="${i.id}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} aria-label="Move up">▲</button><button data-move-item="${i.id}" data-dir="1" ${idx === st.items.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button></div>
+        const last = i.active ? '' : lastSaleOf(i.id);
+        return `<div class="item-row${i.active ? '' : ' off-sale'}"><div class="mover"><button data-move-item="${i.id}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} aria-label="Move up">▲</button><button data-move-item="${i.id}" data-dir="1" ${idx === st.items.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button></div>
           <div class="thumb">${i.image ? `<img src="${h(i.image)}" alt="" />` : bakeArt(i.name)}</div>
-          <div class="info"><b>${h(i.name)}${i.active ? '' : '<span class="pill">Hidden</span>'}${left === 0 ? '<span class="pill warn">Sold out</span>' : ''}</b>
-          <span>${money(i.price)} · ${i.limit == null ? 'no limit' : `${left} of ${i.limit} left`}</span></div>
+          <div class="info"><b>${h(i.name)}${left === 0 && i.active ? '<span class="pill warn">Sold out</span>' : ''}</b>
+          <span>${money(i.price)}${i.active ? ` · ${i.limit == null ? 'no limit' : `${left} of ${i.limit} left`}` : (last ? ` · last in ${h(last)}` : ' · saved for later')}</span></div>
+          <label class="switch insale" title="In ${h(sale)}"><input type="checkbox" data-toggle-item="${i.id}" ${i.active ? 'checked' : ''} /> In this sale</label>
           <button class="btn ghost small" data-edit-item="${i.id}">Edit</button></div>`;
       })
       .join('');
     const adding = editing && editing.kind === 'item' && !editing.id;
-    return `<div class="panel"><div class="panel-head"><div><h2>Menu</h2><p class="muted small" style="margin:0">What customers can order, in this order.</p></div>
+    return `<div class="panel"><div class="panel-head"><div><h2>Menu</h2><p class="muted small" style="margin:0">Everything you make. Tick <b>In this sale</b> for what’s on <b>${h(sale)}</b> (${inSale} of ${st.items.length}); the rest stay saved for another sale. Customers see the ticked ones, in this order.</p></div>
       ${adding ? '' : '<button class="btn small" data-add-item>+ Add item</button>'}</div>
       ${adding ? itemEditor(editing.draft) : ''}${rows || '<p class="empty">No items yet.</p>'}</div>`;
   }
@@ -222,7 +233,14 @@ window.Admin = (function () {
     const f = (name, label, help, type) =>
       `<label class="field"><span>${label}</span>${type === 'area' ? `<textarea name="${name}">${h(s[name])}</textarea>` : `<input type="text" name="${name}" value="${h(s[name])}" />`}${help ? `<small>${help}</small>` : ''}</label>`;
     return `<form class="panel" data-form="settings"><h2>Shop settings</h2><p class="muted small">Changes show on the shop as soon as you save.</p>
-      ${f('season', 'Sale name', 'e.g. "Thanksgiving 2026" or "Christmas 2026". Orders are grouped by this, so change it when you start a new holiday and last season’s orders stay separate.')}
+      ${f('season', 'Sale name', 'e.g. "Thanksgiving 2026" or "Christmas 2026". Orders are grouped by this, so change it when you start a new holiday and last season’s orders stay separate. Each sale remembers its own menu.')}
+      ${(() => {
+        const past = Object.keys(s.saleMenus || {}).filter((k) => k !== s.season);
+        return `<label class="field"><span>When you start a new sale, its menu begins with</span><select name="menuStartFrom">
+          <option value="">What’s in ${h(s.season)} now</option>${past.map((k) => `<option value="${h(k)}">What was in ${h(k)}</option>`).join('')}
+          <option value="none">Nothing yet (I’ll tick items on the Menu)</option></select>
+          <small>Only used when you type a new sale name. Going back to an earlier sale’s name brings back its menu.</small></label>`;
+      })()}
       <label class="field"><span>Order deadline</span><input type="datetime-local" name="deadline" value="${localInput(s.deadline)}" /><small>Orders close automatically after this.</small></label>
       <label class="switch"><input type="checkbox" name="orderingOpen" ${s.orderingOpen ? 'checked' : ''} /> Taking preorders</label>
       ${f('shopName', 'Shop name')}
@@ -354,6 +372,7 @@ window.Admin = (function () {
       const t = e.target;
       if (t.dataset.w != null) return el.oninput(e);
       if (t.dataset.picked) { await run({ action: 'setPickedUp', id: t.dataset.picked, pickedUp: t.checked }); render(); }
+      else if (t.dataset.toggleItem) { await run({ action: 'toggleItem', id: t.dataset.toggleItem, on: t.checked }, t.checked ? `Added to ${st.settings.season}` : 'Saved for another sale'); render(); }
       else if ('season' in t.dataset) { season = t.value; render(); }
       else if ('photo' in t.dataset && t.files[0]) {
         syncDraft();

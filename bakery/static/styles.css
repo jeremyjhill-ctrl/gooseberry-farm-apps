@@ -218,3 +218,11 @@ table.bake td.n b { font-size: 17px; }
 .detail-text { white-space: pre-line; font-size: 16px; line-height: 1.55; margin: 12px 0 16px; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; }
 .detail-done { width: 100%; margin-top: 18px; }
+.item-row.off-sale .thumb, .item-row.off-sale .info { opacity: .55; }
+.item-row .insale { font-size: 14px; white-space: nowrap; }
+@media (max-width: 520px) {
+  .item-row { flex-wrap: wrap; }
+  .item-row .info { flex: 1 1 150px; }
+  .item-row .insale { order: 5; margin-left: 112px; }
+  .item-row > .btn { order: 6; margin-left: auto; }
+}

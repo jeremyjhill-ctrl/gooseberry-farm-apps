@@ -191,6 +191,62 @@ choc = next(i for i in shop["items"] if i["id"] == "choc")
 check("item full description saved with its paragraphs", code == 200 and choc["details"].startswith("Decadent and rich.\nMost"), choc)
 check("allergen tag saved without a doubled 'Contains'", choc["contains"] == "coconut", choc.get("contains"))
 
+# ---- each sale remembers its own menu (Nov 23, 2026)
+def on_shop():
+    return {i["id"] for i in api("GET", "api/shop")[1]["items"]}
+
+
+def admin():
+    return api("GET", "api/admin/state")[1]
+
+
+start_sale = admin()["settings"]["season"]
+all_items = {i["id"] for i in admin()["items"]}
+for i in all_items:
+    api("POST", "api/admin/action", {"action": "toggleItem", "id": i, "on": True})
+check("(setup) every item in the current sale", on_shop() == all_items, on_shop())
+code, _ = api("POST", "api/admin/action", {"action": "toggleItem", "id": "pmps", "on": False})
+check("the In-this-sale switch takes an item off the shop without deleting it", code == 200 and "pmps" not in on_shop()
+      and "pmps" in {i["id"] for i in admin()["items"]})
+check("...and this sale's saved menu updates right away", "pmps" not in admin()["settings"]["saleMenus"][start_sale]
+      and "pump" in admin()["settings"]["saleMenus"][start_sale])
+code, _ = api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": "Christmas 2026", "menuStartFrom": ""}})
+check("a new sale starts with the current menu by default", code == 200 and on_shop() == all_items - {"pmps"}, on_shop())
+api("POST", "api/admin/action", {"action": "toggleItem", "id": "pump", "on": False})
+check("Christmas without pumpkin pie", "pump" not in on_shop())
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": start_sale}})
+check("going back to the earlier sale brings its menu back", on_shop() == all_items - {"pmps"}, on_shop())
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": "Christmas 2026"}})
+check("...and Christmas keeps its own", on_shop() == all_items - {"pmps", "pump"}, on_shop())
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": "Easter 2027", "menuStartFrom": "none"}})
+check("a new sale can start empty", on_shop() == set() and len(admin()["items"]) == len(all_items))
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": "Thanksgiving 2027", "menuStartFrom": start_sale}})
+check("a new sale can start from an earlier sale's menu", on_shop() == all_items - {"pmps"}, on_shop())
+menus = admin()["settings"].get("saleMenus", {})
+check("every sale's menu is remembered", {start_sale, "Christmas 2026", "Easter 2027", "Thanksgiving 2027"} <= set(menus), list(menus))
+api("POST", "api/admin/action", {"action": "saveItem", "item": {"id": "pmps", "name": "Pumpkin Pie, 2 Slices", "description": "Two generous slices.",
+                                                               "price": "14", "active": True}})
+check("ticking In this sale while editing an item counts for this sale", "pmps" in on_shop() and "pmps" in admin()["settings"]["saleMenus"]["Thanksgiving 2027"])
+check("customers never see the list of sales", "saleMenus" not in json.dumps(api("GET", "api/shop")[1]))
+api("POST", "api/admin/action", {"action": "saveItem", "item": {"name": "Gingerbread", "price": "12", "active": True}})
+gid = next(i["id"] for i in admin()["items"] if i["name"] == "Gingerbread")
+api("POST", "api/admin/action", {"action": "deleteItem", "id": gid})
+check("deleting an item takes it out of every sale's menu", all(gid not in ids for ids in admin()["settings"]["saleMenus"].values()))
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"season": start_sale}})
+
+# Mollie's live data today has no saved menus at all: the first sale switch must still keep Thanksgiving's menu.
+import copy  # noqa: E402
+from bakery import store as bakery_store  # noqa: E402
+legacy = copy.deepcopy(bakery_store.default_state())
+legacy["settings"].pop("saleMenus", None)
+next(i for i in legacy["items"] if i["id"] == "pmps")["active"] = False
+before = sorted(i["id"] for i in legacy["items"] if i["active"])
+bakery_store.admin_action(legacy, {"action": "saveSettings", "settings": {"season": "Christmas 2026", "menuStartFrom": "none"}}, 0)
+check("(legacy data) the new sale starts as asked", not any(i["active"] for i in legacy["items"]))
+bakery_store.admin_action(legacy, {"action": "saveSettings", "settings": {"season": "Thanksgiving 2026"}}, 0)
+check("(legacy data) the first switch still keeps the old sale's menu", sorted(i["id"] for i in legacy["items"] if i["active"]) == before,
+      sorted(i["id"] for i in legacy["items"] if i["active"]))
+
 other = Client(wsgi.application)
 code, _ = api("GET", "api/admin/state", client=other)
 check("someone else isn't signed in", code == 401)
