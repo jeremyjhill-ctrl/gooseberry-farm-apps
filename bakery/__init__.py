@@ -240,7 +240,8 @@ def create_app():
                 if img and site().startswith("https://"):
                     product["images"] = [site() + img]
                 line_items.append({"quantity": l["qty"], "price_data": {"currency": "usd", "unit_amount": l["price"], "product_data": product}})
-            meta = {"orderId": order["id"], "orderNumber": str(order["number"]), "pickup": order["pickupLabel"]}
+            meta = {"orderId": order["id"], "orderNumber": str(order["number"]), "pickup": order["pickupLabel"],
+                    "bake": order.get("bakeName", "")[:80]}
             checkout_session = stripe.checkout.Session.create(
                 api_key=stripe_key,
                 mode="payment",
@@ -360,11 +361,9 @@ def create_app():
     @app.get("/api/admin/state")
     def admin_state():
         admin_only()
-        state = reading()
-        now = store.now_ms()
+        state = store.admin_view(reading(), store.now_ms())
         state["demo"] = demo
         state["build"] = farm_build.build()
-        state["stock"] = {i["id"]: store.remaining(state, i, now) for i in state["items"]}
         return jsonify(state)
 
     @app.post("/api/admin/action")
@@ -386,9 +385,11 @@ def create_app():
     def orders_csv():
         admin_only()
         state = reading()
-        season = request.args.get("season") or state["settings"]["season"]
-        safe = re.sub(r"[^\w -]", "", season) or "orders"
-        return Response(store.orders_csv(state, season), mimetype="text/csv",
+        bake = store.find_bake(state, request.args.get("bake")) or (state["bakes"][0] if state["bakes"] else None)
+        if not bake:
+            abort(404)
+        safe = re.sub(r"[^\w -]", "", bake["name"]) or "orders"
+        return Response(store.orders_csv(state, bake["id"]), mimetype="text/csv",
                         headers={"Content-Disposition": 'attachment; filename="{} orders.csv"'.format(safe)})
 
     @app.get("/api/health")

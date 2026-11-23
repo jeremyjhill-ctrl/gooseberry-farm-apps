@@ -47,7 +47,8 @@ visible to you while you're logged in, with a banner.
   booking playdates with a pass (fully covered, partly covered, refused), gate tick-offs and undo, the seasonal switch,
   credits returned when the farm cancels, hand-made codes, expired / turned-off passes, code-guessing lockout, and hiding
   the shop and the booking page.
-- `bakery_test.py`: checks covering the menu, photos, stock limits, card and app payments, Mollie's admin, and that the two logins stay separate.
+- `bakery_test.py`: checks covering the menu, photos, stock limits, card and app payments, Mollie's admin, several Bakes
+  (preorders) open at once with their own menus, stock and pickups, copying a Bake, moving pre-Bake data, and that the two logins stay separate.
 
 - `login_test.py`: 102 checks covering personal logins: setting up the owner login, adding Staci (playdates + shop) and
   Mollie (bakery only), first-login password change, forgot-password links, turning people off, the shared passwords

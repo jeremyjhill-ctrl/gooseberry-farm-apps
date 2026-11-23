@@ -1,8 +1,11 @@
-// Customer-facing shop: menu, cart, checkout and the order confirmation.
+// Customer-facing shop: the preorders taking orders, each one's menu, cart, checkout and the order confirmation.
+// Mollie calls each preorder a "Bake"; customers just see its name and pickup.
 window.Shop = (function () {
   const app = () => document.getElementById('app');
   let data = null;
-  let cart = store.get('mfb_cart', {});
+  let carts = store.get('mfb_carts', {}); // a separate cart for each preorder: { bakeId: { itemId: qty } }
+  let bakeId = store.get('mfb_bake', ''); // the preorder being looked at ('' = choosing)
+  let cart = {};
   let form = Object.assign({ name: '', email: '', phone: '', pickupId: '', pickupWindowId: '', pickupTime: '', allergyNote: '', payMethod: 'card' }, store.get('mfb_form', {}));
   let sheetOpen = false;
   let detailId = null; // item whose detail panel is open
@@ -13,19 +16,37 @@ window.Shop = (function () {
   const lockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
   function saveLocal() {
-    store.set('mfb_cart', cart);
+    if (bakeId) carts[bakeId] = cart;
+    for (const k of Object.keys(carts)) if (!Object.keys(carts[k] || {}).length) delete carts[k];
+    store.set('mfb_carts', carts);
+    store.set('mfb_bake', bakeId);
     store.set('mfb_form', form);
+  }
+
+  const cur = () => (data ? data.bakes.find((b) => b.id === bakeId) : null) || null;
+
+  function choose(id) {
+    if (bakeId) carts[bakeId] = cart;
+    bakeId = id;
+    cart = Object.assign({}, carts[id] || {});
+    saveLocal();
   }
 
   async function load() {
     data = await api('GET', '/api/shop');
-    // Drop anything from the saved cart that's gone or over what's left.
-    for (const id of Object.keys(cart)) {
-      const item = data.items.find((i) => i.id === id);
-      if (!item) delete cart[id];
-      else cart[id] = Math.min(cart[id], maxFor(item));
-      if (!cart[id]) delete cart[id];
+    // Drop saved carts for preorders that closed, and anything that's gone or over what's left.
+    for (const id of Object.keys(carts)) {
+      const b = data.bakes.find((x) => x.id === id);
+      if (!b) { delete carts[id]; continue; }
+      for (const itemId of Object.keys(carts[id])) {
+        const item = b.items.find((i) => i.id === itemId);
+        carts[id][itemId] = item ? Math.min(carts[id][itemId], maxFor(item)) : 0;
+        if (!carts[id][itemId]) delete carts[id][itemId];
+      }
     }
+    if (!data.bakes.some((b) => b.id === bakeId)) bakeId = '';
+    if (!bakeId && data.bakes.length === 1) bakeId = data.bakes[0].id;
+    cart = Object.assign({}, carts[bakeId] || {});
     saveLocal();
   }
 
@@ -33,7 +54,7 @@ window.Shop = (function () {
     const per = data.settings.perOrderMax || 12;
     return item.remaining == null ? per : Math.min(per, item.remaining);
   }
-  const lines = () => data.items.filter((i) => cart[i.id] > 0).map((i) => ({ item: i, qty: cart[i.id] }));
+  const lines = () => (cur() ? cur().items : []).filter((i) => cart[i.id] > 0).map((i) => ({ item: i, qty: cart[i.id] }));
   const count = () => lines().reduce((t, l) => t + l.qty, 0);
   const total = () => lines().reduce((t, l) => t + l.qty * l.item.price, 0);
   const payByApp = () => !!data.appPay && form.payMethod === 'app';
@@ -67,7 +88,7 @@ window.Shop = (function () {
   }
 
   function card(item) {
-    const open = data.ordering.open;
+    const open = cur().ordering.open;
     const soldOut = item.remaining === 0;
     const badge = soldOut
       ? '<span class="badge out">Sold out</span>'
@@ -91,12 +112,12 @@ window.Shop = (function () {
 
   // Pickup choices. When any place has dated windows, customers pick from one list in time order.
   function usesWindows() {
-    return data.pickups.some((p) => p.windows && p.windows.length);
+    return cur().pickups.some((p) => p.windows && p.windows.length);
   }
 
   function pickupChoices() {
     const out = [];
-    for (const p of data.pickups) {
+    for (const p of cur().pickups) {
       if (p.windows && p.windows.length)
         for (const w of p.windows) out.push({ value: `${p.id}|${w.id}`, text: `${w.label} · ${p.label}`, full: w.full, place: p, start: w.start });
       else out.push({ value: `${p.id}|`, text: p.label, full: p.full, place: p, start: '~' });
@@ -121,9 +142,9 @@ window.Shop = (function () {
 
   // Tapping an item: bigger photo, Mollie's full description, and the same Add / + − buttons.
   function detail() {
-    const item = data.items.find((i) => i.id === detailId);
+    const item = cur().items.find((i) => i.id === detailId);
     if (!item) return '';
-    const open = data.ordering.open;
+    const open = cur().ordering.open;
     const soldOut = item.remaining === 0;
     const q = cart[item.id] || 0;
     const control = !open ? '' : soldOut ? '<span class="badge out" style="position:static">Sold out</span>'
@@ -150,7 +171,7 @@ window.Shop = (function () {
     }
     const chosen = usesWindows() ? chosenPickup() : null;
     const askTime = s.askPickupTime && (!usesWindows() || (chosen && !(chosen.place.windows || []).length));
-    const pickups = data.pickups
+    const pickups = cur().pickups
       .map((p) => {
         const on = form.pickupId === p.id;
         return `<label class="pick ${on ? 'on' : ''} ${p.full ? 'full' : ''}">
@@ -162,6 +183,7 @@ window.Shop = (function () {
     return `<div class="sheet-bg" data-close>
       <form class="sheet" id="checkout" novalidate role="dialog" aria-modal="true" aria-labelledby="co-title">
         <div class="sheet-head"><h2 id="co-title">Your order</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+        ${data.bakes.length > 1 ? `<p class="muted small" style="margin:-8px 0 12px">${h(cur().name)}</p>` : ''}
         ${
           ls.length
             ? `<div class="lines">${ls
@@ -197,33 +219,96 @@ window.Shop = (function () {
     </div>`;
   }
 
-  function render() {
+  // "Pickup Wed, Nov 25 · Gooseberry Bridge Farm or Farmers Market of the Ozarks"
+  function pickupLine(b) {
+    const days = b.pickupDays.length <= 3 ? b.pickupDays.join(' & ') : `${b.pickupDays[0]} – ${b.pickupDays[b.pickupDays.length - 1]}`;
+    const places = b.pickups.map((p) => p.label);
+    const where = places.length < 3 ? places.join(' or ') : places.slice(0, -1).join(', ') + ' or ' + places[places.length - 1];
+    return [days ? 'Pickup ' + days : '', where].filter(Boolean).join(' · ');
+  }
+
+  function whenLine(b) {
+    if (b.ordering.opensAt) return `Orders open ${fmtDate(b.ordering.opensAt, data.settings.timezone, true)}`;
+    return b.deadline ? `Order by ${fmtDate(b.deadline, data.settings.timezone, true)}` : '';
+  }
+
+  function bakeCard(b) {
+    const n = Object.values(carts[b.id] || {}).reduce((t, q) => t + q, 0);
+    return `<button type="button" class="bake-card" data-bake="${b.id}">
+      <h3>${h(b.name)}</h3>
+      ${pickupLine(b) ? `<span class="when">${h(pickupLine(b))}</span>` : ''}
+      ${b.ordering.opensAt ? `<span class="soon">${h(whenLine(b))}</span>` : whenLine(b) ? `<span class="by">${h(whenLine(b))}</span>` : ''}
+      ${!b.ordering.open && !b.ordering.opensAt ? `<span class="by">${h(b.ordering.reason)}</span>` : ''}
+      ${n ? `<span class="in-cart">${n} item${n > 1 ? 's' : ''} in your order</span>` : ''}
+      <span class="go">See the menu →</span>
+    </button>`;
+  }
+
+  function hero(eyebrow, intro) {
     const s = data.settings;
-    const n = count();
-    app().innerHTML = `
-      <header class="hero wrap">
-        <div class="eyebrow">${h(s.season)} preorders</div>
+    return `<header class="hero wrap">
+        <div class="eyebrow">${h(eyebrow)}</div>
         <h1>${h(s.shopName)}</h1>
         ${s.tagline ? `<p class="tagline">${h(s.tagline)}</p>` : ''}
-        ${s.intro ? `<p class="intro">${h(s.intro)}</p>` : ''}
+        ${intro ? `<p class="intro">${h(intro)}</p>` : ''}
         ${s.dietaryNote ? `<div class="dietary">${leafIcon}<span>${h(s.dietaryNote)}</span></div>` : ''}
-      </header>
-      <main class="wrap">
-        ${data.demo ? '<div class="banner demo">Demo mode: orders go through without a real payment.</div>' : ''}
-        ${data.ordering.open ? '' : `<div class="banner closed">${h(data.ordering.reason)}</div>`}
-        <section class="menu" aria-label="Menu">${data.items.map(card).join('')}</section>
-      </main>
-      <footer class="site"><div class="wrap">
+      </header>`;
+  }
+
+  function footer() {
+    const s = data.settings;
+    return `<footer class="site"><div class="wrap">
         ${s.contactNote ? `<p>${h(s.contactNote)}</p>` : ''}
         <p><a class="quiet" href="#admin">Baker login</a></p>
-      </div></footer>
-      ${n && data.ordering.open && !sheetOpen && !detailId ? `<div class="cartbar"><button class="btn" data-open><span>Review order · ${n} item${n > 1 ? 's' : ''}</span><span>${money(total())} →</span></button></div>` : ''}
+      </div></footer>`;
+  }
+
+  function render() {
+    const s = data.settings;
+    const b = cur();
+    const demo = data.demo ? '<div class="banner demo">Demo mode: orders go through without a real payment.</div>' : '';
+    if (!b) {
+      // Nothing to show, or several preorders to choose from.
+      document.body.style.overflow = '';
+      app().innerHTML = `${hero('Preorders', s.intro)}
+        <main class="wrap">${demo}
+          ${data.bakes.length
+            ? `<h2 class="section-head">Choose your preorder</h2><div class="bake-cards">${data.bakes.map(bakeCard).join('')}</div>`
+            : `<div class="banner closed">Preorders are closed right now. Check back soon!</div>`}
+        </main>${footer()}`;
+      return;
+    }
+    const n = count();
+    const open = b.ordering.open;
+    const why = b.ordering.opensAt ? `${whenLine(b)}. Here’s what’s on the menu.` : b.ordering.reason;
+    app().innerHTML = `
+      ${hero(`${b.name} preorders`, b.note || s.intro)}
+      <main class="wrap">
+        ${data.bakes.length > 1 ? `<button type="button" class="back-link" data-all>← All preorders</button>` : ''}
+        ${demo}
+        ${open ? '' : `<div class="banner ${b.ordering.opensAt ? 'soon' : 'closed'}">${h(why)}</div>`}
+        <section class="menu" aria-label="Menu">${b.items.map(card).join('')}</section>
+      </main>
+      ${footer()}
+      ${n && open && !sheetOpen && !detailId ? `<div class="cartbar"><button class="btn" data-open><span>Review order · ${n} item${n > 1 ? 's' : ''}</span><span>${money(total())} →</span></button></div>` : ''}
       ${sheetOpen ? sheet() : detailId ? detail() : ''}`;
     document.body.style.overflow = sheetOpen || detailId ? 'hidden' : '';
   }
 
+  // Switching between preorders keeps the address bar in step, so the Back button and shared links work.
+  function go(id) {
+    choose(id);
+    sheetOpen = false;
+    detailId = null;
+    error = '';
+    const url = location.pathname + (id ? '?bake=' + encodeURIComponent(id) : '');
+    history.pushState({ bake: id }, '', url);
+    render();
+    window.scrollTo(0, 0);
+  }
+
   function bump(id, d) {
-    const item = data.items.find((i) => i.id === id);
+    const item = cur() && cur().items.find((i) => i.id === id);
     if (!item) return;
     cart[id] = Math.max(0, Math.min(maxFor(item), (cart[id] || 0) + d));
     if (!cart[id]) delete cart[id];
@@ -246,15 +331,12 @@ window.Shop = (function () {
     try {
       const res = await api('POST', '/api/checkout', {
         ...form,
+        bakeId,
         pickupWindowId: usesWindows() ? form.pickupWindowId : '',
         payMethod: payByApp() ? 'app' : 'card',
         cart: Object.entries(cart).map(([itemId, qty]) => ({ itemId, qty }))
       });
-      if (window.DemoBackend) {
-        busy = false;
-        sheetOpen = false;
-        return showOrder(res.orderId);
-      }
+      store.set('mfb_paying', bakeId);
       location.href = res.url;
     } catch (e) {
       busy = false;
@@ -280,7 +362,11 @@ window.Shop = (function () {
       await new Promise((r) => setTimeout(r, 2000));
     }
     if (order.status === 'paid' || order.status === 'awaiting') {
-      cart = {};
+      // The cart for the preorder they just checked out is done; their other preorders' carts stay.
+      const paidFor = store.get('mfb_paying', '');
+      if (paidFor) delete carts[paidFor];
+      if (paidFor === bakeId) cart = {};
+      store.set('mfb_paying', '');
       saveLocal();
     }
     if (order.status === 'awaiting') return showAwaiting(order);
@@ -343,9 +429,10 @@ window.Shop = (function () {
   function bind() {
     const el = app();
     el.onclick = (e) => {
-      const t = e.target.closest('[data-inc],[data-dec],[data-open],[data-close],[data-detail],[data-close-detail],[data-home],[data-copy-memo],[data-demo-pay]');
+      const t = e.target.closest('[data-inc],[data-dec],[data-open],[data-close],[data-detail],[data-close-detail],[data-copy-memo],[data-bake],[data-all]');
       if (!t) return;
-      if (t.dataset.demoPay) return toast(`In the real shop, this opens ${t.dataset.demoPay} with the amount filled in.`);
+      if (t.dataset.bake) return go(t.dataset.bake);
+      if ('all' in t.dataset) return go('');
       if (t.dataset.copyMemo) {
         navigator.clipboard.writeText(t.dataset.copyMemo).then(() => toast('Copied'), () => toast('Type it in the note: ' + t.dataset.copyMemo));
         return;
@@ -359,7 +446,6 @@ window.Shop = (function () {
       else if (t.dataset.dec) bump(t.dataset.dec, -1);
       else if ('open' in t.dataset) { sheetOpen = true; error = ''; render(); }
       else if ('close' in t.dataset && (t === e.target || t.classList.contains('x'))) { sheetOpen = false; render(); }
-      else if ('home' in t.dataset && window.DemoBackend) { e.preventDefault(); start(); }
     };
     el.oninput = (e) => {
       const f = e.target;
@@ -402,6 +488,17 @@ window.Shop = (function () {
     sheetOpen = false;
     detailId = null;
     const q = new URLSearchParams(location.search);
+    window.onpopstate = () => {
+      if (!data || location.hash === '#admin') return;
+      choose(new URLSearchParams(location.search).get('bake') || (data.bakes.length === 1 ? data.bakes[0].id : ''));
+      sheetOpen = false;
+      detailId = null;
+      render();
+    };
+    // A link straight to one preorder opens it; coming back from Stripe returns to the one they were in.
+    // Otherwise, with several open, customers start by seeing them all.
+    if (q.get('bake')) bakeId = q.get('bake');
+    else if (!q.get('cancelled') && !q.get('order')) bakeId = '';
     if (q.get('order')) {
       const id = q.get('order');
       const sid = q.get('session_id');

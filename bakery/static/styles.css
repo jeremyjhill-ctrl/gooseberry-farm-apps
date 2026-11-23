@@ -65,6 +65,7 @@ textarea { min-height: 84px; resize: vertical; }
 .dietary svg { flex: none; margin-top: 2px; }
 .banner { border-radius: var(--radius); padding: 14px 16px; margin: 0 0 18px; font-weight: 600; }
 .banner.closed { background: #f6e2dd; color: #7a2c1f; }
+.banner.soon { background: #fdf0d8; color: #7a4a10; }
 .banner.demo { background: #fff4d6; color: #6b4f0f; font-weight: 500; font-size: 14px; }
 
 /* ---------- shop: menu ---------- */
@@ -219,10 +220,42 @@ table.bake td.n b { font-size: 17px; }
 .detail-row { display: flex; justify-content: space-between; align-items: center; }
 .detail-done { width: 100%; margin-top: 18px; }
 .item-row.off-sale .thumb, .item-row.off-sale .info { opacity: .55; }
-.item-row .insale { font-size: 14px; white-space: nowrap; }
+
+/* Bakes (admin) */
+.bake-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.group-title + .bake-row { border-top: 0; }
+.bake-row .info { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
+.bake-row .info b { font-size: 16px; overflow-wrap: anywhere; }
+.bake-row .info span { font-size: 14px; color: var(--muted); }
+.bake-row .phase { font-weight: 600; }
+.bake-row .phase .dot { width: 8px; height: 8px; margin-right: 6px; }
+.bake-row.open .phase { color: #3e4f35; }
+.bake-row.upcoming .phase { color: #8a5a00; }
+.bake-actions { display: flex; gap: 4px; align-items: center; }
+.copy-choice { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--cream); border-radius: 12px; padding: 10px 12px; }
+.share-link { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.share-link code { background: var(--cream); border-radius: 6px; padding: 3px 8px; font-size: 13px; word-break: break-all; }
+.bake-item .insale { margin: 0; }
+.howmany { display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+.howmany input { width: 100px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 @media (max-width: 520px) {
-  .item-row { flex-wrap: wrap; }
-  .item-row .info { flex: 1 1 150px; }
-  .item-row .insale { order: 5; margin-left: 112px; }
-  .item-row > .btn { order: 6; margin-left: auto; }
+  .bake-item { flex-wrap: wrap; }
+  .bake-item .info { flex: 1 1 150px; }
+  .bake-item .howmany { order: 5; margin-left: 110px; display: flex; align-items: center; gap: 8px; }
 }
+
+/* choosing a pickup (customer, when several are open) */
+.bake-cards { display: grid; gap: 14px; margin: 6px 0 30px; }
+@media (min-width: 700px) { .bake-cards { grid-template-columns: 1fr 1fr; } }
+.bake-card { display: grid; gap: 6px; align-content: start; text-align: left; background: var(--paper); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 18px; cursor: pointer; font: inherit; color: inherit; box-shadow: 0 1px 0 rgba(0,0,0,.02); }
+.bake-card:hover, .bake-card:focus-visible { border-color: var(--berry); }
+.bake-card h3 { font-family: var(--display); font-size: 22px; margin: 0; }
+.bake-card .when { font-weight: 600; }
+.bake-card .by { font-size: 14px; color: var(--muted); }
+.bake-card .soon { font-size: 14px; color: #8a5a00; font-weight: 600; }
+.bake-card .go { color: var(--berry); font-weight: 700; margin-top: 4px; }
+.bake-card .in-cart { font-size: 13px; font-weight: 700; color: var(--berry-dark); }
+.section-head { font-family: var(--display); font-size: 24px; margin: 8px 0 12px; }
+.back-link { background: none; border: 0; padding: 0; font: inherit; color: var(--berry); font-weight: 600; cursor: pointer; margin: 0 0 12px; }
+.bake-note { white-space: pre-line; }
