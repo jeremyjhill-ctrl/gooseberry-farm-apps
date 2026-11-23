@@ -7,9 +7,11 @@ ticks which admins they can use (Playdates, Farm shop, Bakery, Manage logins).
 - Access is checked on every page, so a changed checkbox applies immediately.
 - Switching over: each app keeps accepting its old shared password until at least one active
   person has a login for that app. Nobody is locked out on the day this ships.
-- The farm apps (playdates + shop) share one login; on gooseberrybridge.com addresses the cookie
-  covers every subdomain. The bakery runs on Mollie's own address and has its own login page
-  with her branding (same accounts, nothing farm-branded).
+- One login for everything on the farm's address: playdates, the shop and the bakery's admin (the bakery
+  also answers at /bakery/ on the farm's address, so the Bakery link in the bar never asks you to log in
+  again). The checkboxes alone decide who gets into what. Mollie can also log in on her own address,
+  with her branding and nothing farm-branded: same account, same checkboxes (a browser keeps logins
+  separate per web address, so that's a separate sign-in, not a separate account).
 
 Pages added to an app by `add_pages(app, ...)`, all under /account/:
   login, logout, forgot, reset/<token>, password (change my password), logins (owner only).
@@ -262,8 +264,18 @@ def admin_urls(request):
     bakery_hosts = [h.strip() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()]
     playdates = root + "admin"  # one farm address for playdates and the shop
     shop = root + "shop/admin"
-    bakery = ("https://{}/#admin".format(bakery_hosts[0]) if bakery_hosts and host not in bakery_hosts else root + "bakery/#admin")
+    # The bakery's admin on this same address, so the farm login already covers it (Mollie's own address would ask
+    # again: browsers keep logins separate per address). On Mollie's address itself, her admin is at its root.
+    bakery = root + "#admin" if host in bakery_hosts or host.startswith("bakery.") else root + "bakery/#admin"
     return {"playdates": playdates, "shop": shop, "bakery": bakery}
+
+
+def first_admin(user, script_root=""):
+    """Where someone lands after logging in on the farm's address: the first admin their checkboxes allow."""
+    for key, path in (("playdates", "/admin"), ("shop", "/shop/admin"), ("bakery", "/bakery/#admin"), ("logins", "/account/logins")):
+        if can(user, key):
+            return path
+    return "/account/password"
 
 
 def admin_bar(request, here, logins_url, account_url, logout_url, legacy=False):
@@ -417,11 +429,14 @@ LOGINS = """<div class="row between"><h1>Logins</h1><a class="btn ghost small" h
         <details><summary class="muted">Set a temporary password</summary>
           <div class="row" style="margin-top:6px"><input type="text" name="temp" autocomplete="off" minlength="10" placeholder="at least 10 characters" style="width:220px">
           <button class="btn ghost small" name="action" value="temp">Set it</button></div></details>
+        <details><summary class="muted">Delete…</summary>
+          <div class="row" style="margin-top:6px"><label class="inline"><input type="checkbox" name="confirm_delete" value="1"> <span>Yes, delete {{ u.name }}'s login for good</span></label>
+          <button class="btn ghost small" name="action" value="delete">Delete</button></div></details>
       {% endif %}
     </div>
   </form>
   {% endfor %}
-  <p class="muted" style="margin:0"><b>Playdates</b> and <b>Farm shop</b> share one login. <b>Bakery</b> is Mollie's admin on her own site, with her branding. <b>Manage logins</b> lets someone use this page. Turning someone off logs them out everywhere right away.</p>
+  <p class="muted" style="margin:0">One login covers everything; the boxes decide what each person can open. <b>Bakery</b> is Mollie's admin (she can also log in on her own site, with her branding). <b>Manage logins</b> lets someone use this page. Turning someone off, or deleting them, logs them out everywhere right away.</p>
 </section>
 {% endif %}"""
 
@@ -476,7 +491,9 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
             u, err = authenticate(email, request.form.get("password", ""), request.remote_addr or "")
             if u:
                 token = start_login(u)
-                dest = url_for("account_password", first=1, next=safe_next(nxt)) if u["must_change"] else safe_next(nxt)
+                # No particular page asked for: on the farm's address go to the first admin this person may use.
+                landing = safe_next(nxt) if (nxt or not farm) else first_admin(u)
+                dest = url_for("account_password", first=1, next=landing) if u["must_change"] else landing
                 return set_cookie(redirect(dest), request, token)
             msgs.append("!" + err)
         ready = any_accounts()
@@ -586,7 +603,7 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
                         return set_cookie(resp, request, start_login(user_by_id(uid)))
                     msgs.append("Added {}. Give them their email and the temporary password; they'll choose their own when they first "
                                 "log in.".format(name))
-            elif act in ("save", "off", "on", "reset", "temp") and me:
+            elif act in ("save", "off", "on", "reset", "temp", "delete") and me:
                 uid = int(f.get("id", 0))
                 u = user_by_id(uid)
                 if not u:
@@ -606,6 +623,16 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
                         if act == "off":
                             end_all_logins(uid)
                         msgs.append("{} is turned {}.".format(u["name"], "back on" if act == "on" else "off and logged out everywhere"))
+                elif act == "delete":
+                    if uid == me["id"]:
+                        msgs.append("!You can't delete your own login.")
+                    elif f.get("confirm_delete") != "1":
+                        msgs.append("!Tick the box to confirm deleting {}.".format(u["name"]))
+                    else:
+                        end_all_logins(uid)
+                        run("DELETE FROM farm_resets WHERE user_id=?", uid)
+                        run("DELETE FROM farm_users WHERE id=?", uid)
+                        msgs.append("Deleted {}'s login. Their name stays on anything they did before (like pass history).".format(u["name"]))
                 elif act == "reset":
                     token = make_reset(u, hours=24)
                     link = url_for("account_reset", token=token, _external=True)

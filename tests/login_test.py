@@ -225,6 +225,55 @@ check("owner can set a temporary password", "temporary password" in body(r) and 
 r = jer.get("/account/logins")
 check("Logins page lists everyone", all(x in body(r) for x in ("jeremy@example.com", "staci@example.com", "mollie@example.com")))
 
+# ---------------------------------------------------------------- one login for everything on the farm's address
+from urllib.parse import unquote  # noqa: E402
+os.environ["BAKERY_HOSTS"] = "orders.molliesbakery.test"
+jer.post("/account/logins", data={"action": "save", "id": str(me), "can_playdates": "1", "can_shop": "1", "can_bakery": "1", "can_logins": "1"})
+h = body(jer.get("/admin"))
+check("the bar's Bakery link stays on the farm address (no second login)", "http://localhost/bakery/#admin" in h and "molliesbakery.test" not in h,
+      re.findall(r'href="([^"]*bakery[^"]*)"', h))
+check("the bakery admin opens with the farm login", jer.get("/bakery/api/admin/state").status_code == 200)
+bk = body(jer.get("/bakery/"))
+check("the bakery's page on the farm address shows staff the farm bar", "Signed in as <b>Jeremy</b>" in bk and "/shop/admin" in bk)
+check("...customers don't see it", "farmbar" not in body(new().get("/bakery/")))
+own = Client(wsgi.application)
+r = own.post("/api/admin/login", json={"email": "jeremy@example.com", "password": "barn-clover-meadow"}, base_url="http://bakery.molliesbakery.test")
+check("on Mollie's own address the same account works", r.status_code == 200 and own.get("/api/admin/state", base_url="http://bakery.molliesbakery.test").status_code == 200,
+      (r.status_code, body(r)[:200]))
+check("...and her pages there carry no farm bar", "farmbar" not in body(own.get("/", base_url="http://bakery.molliesbakery.test")))
+r = new().post("/account/login", data={"email": "mollie@example.com", "password": "temporary-pw-99"})
+check("Mollie logging in on the farm address lands in the bakery admin", "/bakery/#admin" in unquote(loc(r)), loc(r))
+r = new().post("/account/login", data={"email": "staci@example.com", "password": "another-pw-456"})
+check("Staci lands in the playdate admin", loc(r).endswith("/admin"), loc(r))
+jer.post("/account/logins", data={"action": "add", "name": "Sam", "email": "sam@example.com", "password": "shop-only-pw-77", "can_shop": "1"})
+r = new().post("/account/login", data={"email": "sam@example.com", "password": "shop-only-pw-77"})
+check("someone with only the shop box lands in the shop admin", "/shop/admin" in unquote(loc(r)), loc(r))
+
+# ---------------------------------------------------------------- deleting a login
+jer.post("/account/logins", data={"action": "add", "name": "Helper", "email": "helper@example.com", "password": "helper-temp-pw-1", "can_playdates": "1"})
+helper = q("SELECT * FROM farm_users WHERE email='helper@example.com'")[0]
+hp = new()
+login(hp, "helper@example.com", "helper-temp-pw-1")
+hp.post("/account/password", data={"first": "1", "next": "/admin", "password": "helper-own-pw-22", "password2": "helper-own-pw-22"})
+check("(setup) the helper is logged in", hp.get("/admin").status_code == 200)
+check("the Logins page offers Delete", "Delete…" in body(jer.get("/account/logins")))
+r = jer.post("/account/logins", data={"action": "delete", "id": str(helper["id"])})
+check("delete needs the confirm box", q("SELECT id FROM farm_users WHERE id=?", helper["id"]) and "Tick the box" in body(r))
+r = new().post("/account/logins", data={"action": "delete", "id": str(helper["id"]), "confirm_delete": "1"})
+check("someone not logged in can't delete", q("SELECT id FROM farm_users WHERE id=?", helper["id"]))
+r = jer.post("/account/logins", data={"action": "delete", "id": str(helper["id"]), "confirm_delete": "1"})
+check("the owner deletes a login", not q("SELECT id FROM farm_users WHERE id=?", helper["id"]) and "Deleted Helper" in body(r))
+check("...which logs them out everywhere", hp.get("/admin").status_code == 302 and not q("SELECT 1 AS x FROM farm_logins WHERE user_id=?", helper["id"]))
+check("...and they can't log in again", login(new(), "helper@example.com", "helper-own-pw-22").status_code == 200)
+r = jer.post("/account/logins", data={"action": "add", "name": "Helper", "email": "helper@example.com", "password": "helper-again-pw-3"})
+check("the email can be used again for a new login", len(q("SELECT id FROM farm_users WHERE email='helper@example.com'")) == 1)
+r = jer.post("/account/logins", data={"action": "delete", "id": str(me), "confirm_delete": "1"})
+check("the owner can't delete himself", q("SELECT id FROM farm_users WHERE id=?", me) and "delete your own" in body(r))
+st2 = new()
+login(st2, "staci@example.com", "another-pw-456")
+r = st2.post("/account/logins", data={"action": "delete", "id": str(mollie["id"]), "confirm_delete": "1"})
+check("someone without Manage logins can't delete", q("SELECT id FROM farm_users WHERE id=?", mollie["id"]))
+
 # ---------------------------------------------------------------- log out, lockout, redirects
 r = jer.get("/admin/logout")
 check("playdate log out goes through the personal log out", "/account/logout" in loc(r))

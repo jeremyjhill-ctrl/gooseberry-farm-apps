@@ -170,6 +170,18 @@ def create_app():
     def index():
         resp = app.send_static_file("index.html")
         resp.headers["Cache-Control"] = "no-cache"
+        # On the farm's own address, staff who are logged in get the farm's green bar (links to the other admins).
+        # Mollie's own address stays hers: no farm branding there.
+        host = request.host.split(":")[0].lower()
+        bakery_host = host in {h.strip().lower() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()} \
+            or host.startswith("bakery.")
+        u = fa.current_user(request)
+        if not bakery_host and u:
+            resp.direct_passthrough = False
+            html = resp.get_data(as_text=True)
+            bar = str(fa.admin_bar(request, "bakery", "/account/logins", "/account/password", "/account/logout"))
+            html = html.replace("<body>", "<body>" + bar, 1) if "<body>" in html else bar + html
+            resp.set_data(html)
         return resp
 
     @app.get("/admin")

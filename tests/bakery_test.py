@@ -65,7 +65,7 @@ def buyer(**kw):
 code, shop = api("GET", "api/shop")
 check("shop loads", code == 200 and len(shop["items"]) == 6, code)
 check("app payments offered", shop["appPay"] and shop["appPay"]["apps"] == ["Venmo", "Cash App", "PayPal"])
-check("ordering open", shop["ordering"]["open"])
+check("ordering open (or closed only by the starting deadline)", shop["ordering"]["open"] or "deadline" in shop["ordering"].get("reason", ""))
 
 code, _ = api("GET", "api/admin/state")
 check("admin needs login", code == 401)
@@ -77,6 +77,9 @@ code, st = api("GET", "api/admin/state")
 check("build number in Mollie's admin", bool(st.get("build")), st.get("build"))
 check("admin state", code == 200 and st["settings"]["shopName"] == "Mollie's Farmhouse Bakery")
 
+# The starting settings carry Mollie's real Thanksgiving deadline; clear it so this check doesn't depend on today's date.
+api("POST", "api/admin/action", {"action": "saveSettings", "settings": {"deadline": ""}})
+check("ordering open", api("GET", "api/shop")[1]["ordering"]["open"])
 jpeg = base64.b64encode(b"\xff\xd8\xff\xe0fakejpegbytes\xff\xd9").decode()
 code, res = api("POST", "api/admin/action", {"action": "saveItem", "item": {"id": "pump", "name": "Pumpkin Pie", "description": "Whole 9-inch pie.",
                                                                             "price": "35.00", "limit": "2", "active": True, "image": "data:image/jpeg;base64," + jpeg}})
