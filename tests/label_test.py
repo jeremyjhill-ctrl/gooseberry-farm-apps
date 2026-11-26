@@ -65,7 +65,7 @@ def flashes(c, path):
 
 # ---------------------------------------------------------------- the Shippo stand-in
 CALLS = []
-TROUBLE = {"no_rates": False, "buy_fails": False, "refund_fails": False, "slow_buy": 0.0}
+TROUBLE = {"no_rates": False, "buy_fails": False, "refund_fails": False, "slow_buy": 0.0, "no_media": False}
 real_call = farm_shippo.call
 
 
@@ -75,14 +75,16 @@ def standin(method, path, data=None):
         if TROUBLE["no_rates"]:
             return {"object_id": "shp_x", "rates": [], "messages": [{"text": "The address as submitted could not be found."}]}
         n = len([c for c in CALLS if c[1] == "/shipments/"])
-        return {"object_id": "shp_{}".format(n), "status": "SUCCESS", "rates": [
+        return {"object_id": "shp_{}".format(n), "status": "SUCCESS", "rates": [r for r in [
             {"object_id": "rate_pri_{}".format(n), "amount": "9.85", "provider": "USPS", "estimated_days": 2,
              "servicelevel": {"name": "Priority Mail", "token": "usps_priority"}},
             {"object_id": "rate_ga_{}".format(n), "amount": "5.62", "provider": "USPS", "estimated_days": 4,
              "servicelevel": {"name": "Ground Advantage", "token": "usps_ground_advantage"}},
             {"object_id": "rate_mm_{}".format(n), "amount": "6.20", "provider": "USPS", "estimated_days": 6,
              "servicelevel": {"name": "Media Mail", "token": "usps_media_mail"}},
-            {"object_id": "rate_bad", "amount": None, "provider": "X"}]}
+            {"object_id": "rate_bad", "amount": None, "provider": "X"}]
+            if not (TROUBLE["no_media"] and "media" in str(r.get("servicelevel", {}).get("token", "")))],
+            "messages": [{"source": "USPS", "text": "Media Mail is not available for this account."}] if TROUBLE["no_media"] else []}
     if path == "/transactions/" and method == "POST":
         if TROUBLE["slow_buy"]:
             time.sleep(TROUBLE["slow_buy"])
@@ -402,6 +404,13 @@ check("a profile's own box is used when the product has none", (pb.get("length")
 first = re.search(r'name="rate_0" value="([^"]+)"', lp)
 check("the profile's preferred service (Media Mail) comes first, marked suggested", first and "Media Mail" in first.group(1)
       and "suggested by the product" in lp, first and first.group(1))
+check("no warning when the preferred service is offered", "didn&#39;t offer" not in lp and "didn't offer" not in lp)
+TROUBLE["no_media"] = True
+lp = body(staff.get("/shop/admin/orders/{}/label".format(cbk)))
+TROUBLE["no_media"] = False
+check("when Shippo leaves out Media Mail, the label page says so with Shippo's reason",
+      "Shippo didn" in lp and "<b>USPS Media Mail</b>" in lp and "Media Mail is not available for this account." in lp
+      and 'name="rate_0"' in lp, re.findall(r'class="flash err"[^>]*>(.{0,300})', lp))
 _, cmix = shipping_of([(CB["id"], 1), (JS["id"], 1)])
 lp = body(staff.get("/shop/admin/orders/{}/label".format(cmix)))
 check("a book shipped with something else is not steered to Media Mail", "suggested by the product" not in lp
@@ -446,7 +455,7 @@ class FakeShippo(http.server.BaseHTTPRequestHandler):
 srv = http.server.HTTPServer(("127.0.0.1", 0), FakeShippo)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 farm_shippo.BASE = "http://127.0.0.1:{}".format(srv.server_port)
-sid, got = farm_shippo.rates({"street1": "a"}, {"street1": "b"}, 9, (10, 8, 4))
+sid, got, _notes = farm_shippo.rates({"street1": "a"}, {"street1": "b"}, 9, (10, 8, 4))
 check("real code: sends Shippo's login header and JSON", SEEN and SEEN[0][1] == "ShippoToken shippo_test_standin" and SEEN[0][2] == "application/json"
       and SEEN[0][3]["parcels"][0]["weight"] == "9", SEEN[:1])
 check("real code: reads Shippo's prices", sid == "shp_real" and got[0]["amount"] == 6.10 and got[0]["service"] == "Ground Advantage")

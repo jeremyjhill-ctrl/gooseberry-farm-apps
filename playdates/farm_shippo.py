@@ -69,8 +69,9 @@ def messages(obj):
 
 def rates(ship_from, ship_to, weight_oz, box, template="", prefer=""):
     """Prices for one parcel: our own box = (length, width, height) inches, or a USPS flat-rate template.
-    Returns (shipment_id, [rate...]): the preferred service first if there is one, then cheapest first;
-    each rate: id, amount (float), carrier, service, token, days, terms, preferred."""
+    Returns (shipment_id, [rate...], notes): the preferred service first if there is one, then cheapest first;
+    each rate: id, amount (float), carrier, service, token, days, terms, preferred. notes is Shippo's own
+    explanation of anything it left out (a carrier or service that didn't price this package), or ""."""
     if template:
         parcel = {"template": template, "weight": "{:g}".format(weight_oz), "mass_unit": "oz"}
     else:
@@ -92,7 +93,7 @@ def rates(ship_from, ship_to, weight_oz, box, template="", prefer=""):
     out.sort(key=lambda x: (not x["preferred"], x["amount"]))
     if not out:
         raise ShippoError(messages(shipment) or "Shippo found no prices for this package. Check the address, weight and box size.")
-    return shipment.get("object_id"), out
+    return shipment.get("object_id"), out, messages(shipment)
 
 
 def buy(rate_id, label_size, order_code):

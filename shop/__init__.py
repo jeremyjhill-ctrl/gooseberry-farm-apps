@@ -1619,13 +1619,17 @@ def create_app():
         if "template" in f or f.get("box"):  # staff picked a flat-rate box, or typed their own box, on this page
             template = f.get("template") if f.get("template") in farm_shippo.TEMPLATES else ""
             box = farm_shippo.TEMPLATES[template][1:] if template else parse_box(f.get("box"))
-        rates, error = [], ""
+        rates, error, notes, missing_service = [], "", "", ""
         if not problem and weight and box:
             try:
-                _, rates = farm_shippo.rates(ship_from(), ship_to(o), weight, box, template=template, prefer=guess["prefer"])
+                _, rates, notes = farm_shippo.rates(ship_from(), ship_to(o), weight, box, template=template, prefer=guess["prefer"])
             except farm_shippo.ShippoError as e:
                 error = str(e)
+            # The profile's service (say Media Mail) wasn't among Shippo's prices: say so instead of quietly showing the rest.
+            if rates and guess["prefer"] and not any(r["preferred"] for r in rates):
+                missing_service = farm_shippo.SERVICES.get(guess["prefer"], guess["prefer"])
         return render_template("admin/label.html", o=o, problem=problem, rates=rates, error=error, weight=weight, box=box,
+                               notes=notes, missing_service=missing_service,
                                template=template, templates=farm_shippo.TEMPLATES, missing=guess["missing"], nobox=guess["nobox"],
                                profiles=guess["profiles"],
                                labels=[x for x in order_labels(o) if x["status"] == "bought"],
