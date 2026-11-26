@@ -715,6 +715,12 @@ check("a count can't go below zero", left(A, PLAY) == 0)
 c.post("/shop/pass/{}/adjust".format(A), data={"left_{}".format(PLAY): "1", "reason": "undo typo"})
 check("a playdate given back can be booked online again", left(A, PLAY) == 1)
 
+# The "one save, once" script with its slow-save safety net (Nov 26, 2026): same file on the shop and playdate pages.
+shop_js = open(os.path.join(ROOT, "shop", "static", "once.js")).read()
+check("slow-save safety net is in the shop's script and the playdate pages' copy is the same",
+      "taking longer than usual" in shop_js and shop_js == open(os.path.join(ROOT, "playdates", "static", "once.js")).read())
+check("shop and playdate pages load it", "/shop/static/once.js" in body(guest.get("/shop/cart")) and "once.js" in body(guest.get("/book")))
+
 summary = {"database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite", "passed": len(results) - len(failures),
            "total": len(results), "failures": failures}
 print(json.dumps(summary, indent=1))
