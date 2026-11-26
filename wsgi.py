@@ -36,11 +36,16 @@ import app as playdates  # noqa: E402  (the playdate app, unchanged)
 from bakery import create_app  # noqa: E402
 import shop as farm_shop  # noqa: E402
 from werkzeug.middleware.dispatcher import DispatcherMiddleware  # noqa: E402
+from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
 
 bakery = create_app()
 shop = farm_shop.create_app()
 BAKERY_HOSTS = {h.strip().lower() for h in os.environ.get("BAKERY_HOSTS", "").split(",") if h.strip()}
-by_path = DispatcherMiddleware(playdates.app.wsgi_app, {"/bakery": bakery.wsgi_app, "/shop": shop.wsgi_app})
+# Behind Render, every request arrives from Render's own front door. ProxyFix lets the farm pages (booking, the staff
+# admin and the sign-in page) see each visitor's real address, like the shop and bakery already do. Without it the
+# "too many wrong passwords" pause counted everyone's typos together (found Nov 26, 2026: Staci couldn't sign in).
+farm_side = ProxyFix(playdates.app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+by_path = DispatcherMiddleware(farm_side, {"/bakery": bakery.wsgi_app, "/shop": shop.wsgi_app})
 
 
 def application(environ, start_response):

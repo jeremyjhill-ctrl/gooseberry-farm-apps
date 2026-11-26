@@ -290,6 +290,31 @@ r = lock.post("/account/login", data={"email": "jeremy@example.com", "password":
 check("too many wrong tries pauses logins", "Too many tries" in body(r))
 farm_auth.LOGIN_TRIES.clear()
 
+
+# On Render every request reaches the app from Render's front door (one address); the visitor's own address
+# comes in X-Forwarded-For. Found Nov 26, 2026: the pause counted everyone together, so Staci couldn't sign in.
+def via_render(client, visitor, email, pw):
+    return client.post("/account/login", data={"email": email, "password": pw},
+                       headers={"X-Forwarded-For": visitor, "X-Forwarded-Proto": "https"}, environ_base={"REMOTE_ADDR": "10.0.0.1"})
+
+
+home, away = "203.0.113.5", "198.51.100.7"
+for _ in range(8):
+    via_render(new(), home, "staci@example.com", "typo-typo-typo")
+check("one person's typos pause only their own sign-in", "Too many tries" in body(via_render(new(), home, "staci@example.com", "typo-typo-typo")))
+check("...not someone else signing in from the same house", via_render(new(), home, "jeremy@example.com", "barn-clover-meadow").status_code == 302)
+check("...and not other visitors (each visitor's real address is seen behind Render)",
+      "didn&#39;t match" in body(via_render(new(), away, "staci@example.com", "typo-typo-typo")))
+check("an email typed with capitals or spaces counts as the same person",
+      "Too many tries" in body(via_render(new(), home, " Staci@Example.com", "typo-typo-typo")))
+farm_auth.LOGIN_TRIES.clear()
+for n in range(30):
+    via_render(new(), away, "guess{}@example.com".format(n), "guess-guess-guess")
+check("someone guessing at many logins from one address is paused",
+      "Too many tries" in body(via_render(new(), away, "jeremy@example.com", "barn-clover-meadow")))
+check("...while everyone else signs in normally", via_render(new(), home, "jeremy@example.com", "barn-clover-meadow").status_code == 302)
+farm_auth.LOGIN_TRIES.clear()
+
 # ---------------------------------------------------------------- the booking page and customer pages are untouched
 check("customers still book without logging in", new().get("/book").status_code == 200)
 check("shop customer page untouched", new().get("/shop/").status_code in (200, 503))

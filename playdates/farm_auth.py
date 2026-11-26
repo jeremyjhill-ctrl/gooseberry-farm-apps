@@ -157,24 +157,33 @@ def owners():
 
 # ---------------------------------------------------------------- logging in and out
 
-LOGIN_TRIES = {}  # (ip) -> recent failure times
+LOGIN_TRIES = {}  # key -> recent failure times
+TRIES_PER_PERSON = 8   # wrong passwords for one email from one address, per 10 minutes
+TRIES_PER_ADDRESS = 30  # wrong passwords from one address for any emails (someone guessing at many logins)
 
 
-def too_many(ip):
-    recent = [t for t in LOGIN_TRIES.get(ip, []) if time.time() - t < 600]
-    LOGIN_TRIES[ip] = recent
-    return len(recent) >= 8
+def _recent(key):
+    recent = [t for t in LOGIN_TRIES.get(key, []) if time.time() - t < 600]
+    LOGIN_TRIES[key] = recent
+    return len(recent)
+
+
+def too_many(ip, email=""):
+    """Counted per person and address, so one person's typos don't lock out everyone else in the house."""
+    return _recent(("person", ip, email)) >= TRIES_PER_PERSON or _recent(("address", ip)) >= TRIES_PER_ADDRESS
 
 
 def authenticate(email, password, ip):
     """Returns (user, error)."""
-    if too_many(ip):
+    email = (email or "").strip().lower()
+    if too_many(ip, email):
         return None, "Too many tries. Please wait 10 minutes and try again."
     u = user_by_email(email)
     if not u or not u["active"] or not check_password(u["pw_hash"], password or ""):
-        LOGIN_TRIES.setdefault(ip, []).append(time.time())
+        LOGIN_TRIES.setdefault(("person", ip, email), []).append(time.time())
+        LOGIN_TRIES.setdefault(("address", ip), []).append(time.time())
         return None, "That email and password didn't match."
-    LOGIN_TRIES.pop(ip, None)
+    LOGIN_TRIES.pop(("person", ip, email), None)
     return u, ""
 
 
