@@ -685,8 +685,12 @@ def register(pd):
         s = pd.get_settings()
         if not s.get("booking_hidden"):
             return None
+        # While the shop is open, send visitors there (passes and gift certificates are on sale); otherwise no button.
+        shop_open = not shop_hidden()
         return render_template("message.html", title=s.get("booking_hidden_title") or "Playdate booking isn't open yet",
-                               body=s.get("booking_hidden_message") or BOOKING_HIDDEN_MESSAGE)
+                               body=s.get("booking_hidden_message") or BOOKING_HIDDEN_MESSAGE,
+                               link=request.script_root + "/shop/" if shop_open else "",
+                               link_text="Visit our farm shop" if shop_open else "")
 
     # ------------------------------------------------------------ email status on Admin > Messages
     import farm_mail

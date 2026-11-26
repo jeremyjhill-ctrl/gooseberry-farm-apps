@@ -3,6 +3,6 @@
 <section class="card">
   <h1>{{ title }}</h1>
   <p>{{ body }}</p>
-  <a class="btn" href="{{ link }}">{{ link_text }}</a>
+  {% if link %}<a class="btn" href="{{ link }}">{{ link_text }}</a>{% endif %}
 </section>
 {% endblock %}

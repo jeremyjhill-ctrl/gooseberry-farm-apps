@@ -920,8 +920,12 @@ def create_app():
             for p in o["passes"]:
                 who = " (for {})".format(p["gift_for"]) if p["gift_for"] else ""
                 lines.append("  {}{}: {}".format(p["title"], who, url_for("pass_page", code=p["code"], _external=True)))
-            lines += ["", "To book a playdate, pick a time on our booking page and enter your pass code at checkout:",
-                      "  " + booking_url()]
+            if playdate_settings().get("booking_hidden"):
+                lines += ["", "Playdate booking opens soon. When it does, pick a time on our booking page and enter your pass code at checkout:",
+                          "  " + booking_url()]
+            else:
+                lines += ["", "To book a playdate, pick a time on our booking page and enter your pass code at checkout:",
+                          "  " + booking_url()]
         if any(l["fulfillment"] == "ship" for l in o["lines"]):
             lines += ["", "We'll ship to: {}, {} {}, {} {}".format(o["ship_name"], o["ship_line1"], o["ship_line2"] or "", o["ship_city"],
                                                                   o["ship_state"]).replace("  ", " ") + " " + (o["ship_zip"] or "")]
@@ -961,6 +965,7 @@ def create_app():
         return render_template("pass.html", p=p, credits=cr, history=fp.history(con, p["id"]) if is_admin() else [],
                                all_types=credit_types() if is_admin() else [],
                                problem=fp.pass_problem(p), can_book=can_book,
+                               booking_open=not playdate_settings().get("booking_hidden"),
                                qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
 
     @app.get("/pass/<code>/print")

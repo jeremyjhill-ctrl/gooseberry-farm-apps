@@ -467,7 +467,28 @@ check("staff admins live on the farm address", "/admin/login" in loc(visitor.get
       and "/shop/admin/login" in loc(visitor.get("/shop/admin", base_url=FARM)))
 c.post("/shop/admin/visibility", data={"which": "booking", "hidden": "1"})
 check("no Book a playdate tile while booking is hidden", "bookplay" not in body(visitor.get("/shop/", base_url=FARM)))
+# Nov 26, 2026: the hidden booking page showed a blank button that just reloaded it, and pass pages and receipts
+# still sent pass buyers to that page.
+h = body(visitor.get("/book", base_url=FARM))
+check("hidden booking page sends visitors to the open shop", 'href="/shop/">Visit our farm shop</a>' in h, h[-400:])
+check("...and never shows an empty button", not re.search(r'<a class="btn" href="[^"]*">\s*</a>', h))
+c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "1"})
+h = body(visitor.get("/book", base_url=FARM))
+check("with the shop hidden too, the booking message has no button at all", "Visit our farm shop" not in h
+      and not re.search(r'<a class="btn" href="[^"]*">\s*</a>', h) and "isn" in h, h[-400:])
+c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "0"})
+bea = Client(wsgi.application)
+bea.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 1})
+r = bea.post("/shop/checkout", data={"name": "Bea Buyer", "email": "bea@example.com", "agree": "on"})
+bcode = loc(r).rstrip("/").split("/")[-1]
+bea.post("/shop/pay/" + bcode, data={"card": "4242 4242 4242 4242"})
+mail = " ".join(x["body"] for x in q("SELECT body FROM outbox WHERE recipient='bea@example.com'"))
+check("receipt says booking opens soon while it's hidden", "Playdate booking opens soon" in mail and "/shop/pass/" in mail, mail[-400:])
+BP = q("SELECT p.code FROM shop_passes p JOIN shop_orders o ON o.id = p.order_id WHERE o.code=?", bcode)[0]["code"]
+h = body(visitor.get("/shop/pass/" + BP, base_url=FARM))
+check("pass page doesn't send people to the hidden booking page", "Book a playdate with this pass" not in h and "booking isn't open yet" in h)
 c.post("/shop/admin/visibility", data={"which": "booking", "hidden": "0"})
+check("pass page offers booking again once it's open", "Book a playdate with this pass" in body(visitor.get("/shop/pass/" + BP, base_url=FARM)))
 staff = Client(wsgi.application)
 staff.post("/shop/admin/login", data={"password": "playdate"}, base_url=FARM)
 c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "1"})

@@ -18,8 +18,9 @@
     </div>
     {% endfor %}
   </div>
-  {% if can_book and not problem %}<a class="btn" href="{{ booking_url() }}">Book a playdate with this pass</a>
-  <div class="muted" style="text-align:center">Pick your day and arrival time, then enter <b class="code">{{ pretty_code(p.code) }}</b> at checkout.</div>{% endif %}
+  {% if can_book and not problem and booking_open %}<a class="btn" href="{{ booking_url() }}">Book a playdate with this pass</a>
+  <div class="muted" style="text-align:center">Pick your day and arrival time, then enter <b class="code">{{ pretty_code(p.code) }}</b> at checkout.</div>
+  {% elif can_book and not problem %}<div class="muted" style="text-align:center">Playdate booking isn't open yet. When it opens, pick your day and arrival time online and enter <b class="code">{{ pretty_code(p.code) }}</b> at checkout.</div>{% endif %}
 </section>
 <div class="row noprint" style="justify-content:center">
   <a href="{{ url_for('pass_print', code=p.code) }}">Printable version</a>
