@@ -79,6 +79,7 @@ DEFAULT_SETTINGS = {
     "free_ship_over": None,    # free shipping when the shipped items total at least this ($); blank = never
     "pickup_note": "We'll email you when your order is ready to pick up at the farm.",
     "home_state": "MO",
+    "gift_card_photo": "",     # Staci's photo for the front of printable gift cards ("" = the drawn lamb)
     "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
     "email_daily_limit": farm_mail.DEFAULT_DAILY_LIMIT,  # leaves room in Resend's free 100 a day for Pasture Keeper
     "ship_from": {"name": "Gooseberry Bridge Farm", "street1": "", "street2": "", "city": "Rogersville", "state": "MO",
@@ -1029,6 +1030,16 @@ def create_app():
         return render_template("pass_print.html", p=p, credits=fp.credits(db(), p["id"]),
                                qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
 
+    @app.get("/admin/gift-card-sample")
+    @admin_required
+    def gift_card_sample():
+        """What a printed gift card looks like with the current picture (made-up pass details)."""
+        fake = {"code": "SAMPLE00", "title": "Spring Family Pass", "gift_for": "The Miller family", "holder": "Ann Buyer",
+                "season_label": "Good during the 2027 season", "valid_until": ""}
+        return render_template("gift_card.html", p=fake, style="flat" if request.args.get("style") == "flat" else "folded", sample=True,
+                               credits=[{"qty": 2, "name": "Playdate"}], to="The Miller family", frm="Ann Buyer",
+                               site=request.host + request.script_root, qr=qr_svg("https://example.com/sample"))
+
     @app.get("/pass/<code>/card/<style>")
     def pass_card(code, style):
         """A printable gift card for under the tree: folded (one letter sheet, folded in quarters) or flat (half sheet).
@@ -1870,6 +1881,23 @@ def create_app():
                                webhook_url=url_for("stripe_webhook", _external=True),
                                label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES, profiles=ship_profiles(),
                                templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES, farm_email=farm_email())
+
+    @app.post("/admin/settings/gift-card")
+    @admin_required
+    def admin_settings_gift_card():
+        """The picture on the front of printable gift cards. Removing it brings back the drawn lamb."""
+        f = request.form
+        if f.get("remove") == "1":
+            save_setting("gift_card_photo", "")
+            flash("Gift cards are back to the drawn lamb.")
+        else:
+            saved = save_photo(f.get("photo_data", "")) if f.get("photo_data", "").startswith("data:") else None
+            if not saved:
+                flash("Choose a photo first (JPG, PNG or WebP).")
+                return redirect(url_for("admin_settings") + "#giftcard")
+            save_setting("gift_card_photo", saved)
+            flash("Gift card picture saved.")
+        return redirect(url_for("admin_settings") + "#giftcard")
 
     @app.post("/admin/settings/email")
     @admin_required

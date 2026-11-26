@@ -89,6 +89,40 @@
   <label style="max-width:340px">Labels print on <select name="label_size">{% for k, v in label_sizes.items() %}<option value="{{ k }}" {{ 'selected' if SS.label_size == k }}>{{ v }}</option>{% endfor %}</select></label>
   <button class="btn">Save label settings</button>
 </form>
+<form method="post" action="{{ url_for('admin_settings_gift_card') }}" class="card" id="giftcard">
+  <h2>Gift card picture</h2>
+  <div class="muted">The picture on the front of the printable gift cards buyers can print for gift passes. A square or tall photo with the animal in the middle works best, since the edges are trimmed to fit. Bright, simple photos print best on home printers.</div>
+  <div class="row" style="gap:16px;align-items:flex-start">
+    {% if SS.gift_card_photo %}<img src="{{ url_for('photo', name=SS.gift_card_photo) }}" alt="Current gift card picture" style="width:150px;height:195px;object-fit:cover;border-radius:12px;border:1px solid #DDE0D6">
+    {% else %}<div class="muted" style="width:150px;height:195px;border:1px dashed #C9CEC0;border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px">Using the drawn lamb</div>{% endif %}
+    <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:200px">
+      <label>{{ 'Choose a different photo' if SS.gift_card_photo else 'Choose a photo' }} <input type="file" accept="image/*" data-gift-photo></label>
+      <input type="hidden" name="photo_data">
+      <div class="row" style="gap:8px"><button class="btn" data-gift-save {{ 'hidden' }}>Save picture</button>
+        {% if SS.gift_card_photo %}<button class="btn ghost" name="remove" value="1" formnovalidate>Go back to the lamb</button>{% endif %}</div>
+      <a href="{{ url_for('gift_card_sample') }}" target="_blank">See a sample card</a>
+    </div>
+  </div>
+</form>
+<script>
+(function () {
+  // Shrink the chosen photo in the browser (like product photos), then show Save.
+  var input = document.querySelector('[data-gift-photo]'), form = input.form, save = form.querySelector('[data-gift-save]');
+  input.addEventListener('change', function () {
+    var file = input.files[0]; if (!file) return;
+    var url = URL.createObjectURL(file), pic = new Image();
+    pic.onload = function () {
+      var k = Math.min(1, 1600 / Math.max(pic.naturalWidth, pic.naturalHeight));
+      var c = document.createElement('canvas'); c.width = Math.round(pic.naturalWidth * k); c.height = Math.round(pic.naturalHeight * k);
+      var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(pic, 0, 0, c.width, c.height);
+      form.querySelector('[name=photo_data]').value = c.toDataURL('image/jpeg', 0.85);
+      URL.revokeObjectURL(url); save.hidden = false; save.textContent = 'Save picture';
+    };
+    pic.onerror = function () { alert("That photo couldn't be opened. Try a JPG or PNG."); };
+    pic.src = url;
+  });
+})();
+</script>
 {% set svc = email_service() %}
 <form method="post" action="{{ url_for('admin_settings_email') }}" class="card" id="email">
   <h2>Email</h2>

@@ -23,6 +23,7 @@ body{margin:0;font-family:Nunito,sans-serif;color:#1E2A20;background:#F7F5EE}
 .flat{width:8.5in;height:5.5in;display:grid;grid-template-columns:3.1in 1fr;border:1px dashed #C9CEC0}
 .panel{padding:.45in .42in;display:flex;flex-direction:column;gap:.14in;overflow:hidden}
 .flip{transform:rotate(180deg)}
+.coverphoto{width:100%;object-fit:cover;border-radius:.12in;display:block}
 .cover{background:#E9F0E2;align-items:center;justify-content:center;text-align:center}
 .cover .big{font-family:Fredoka,sans-serif;font-weight:600;font-size:30pt;line-height:1.05;color:#2F5D3A}
 .cover .sub{font-size:11.5pt;font-weight:700;color:#4F5A51}
@@ -46,8 +47,9 @@ ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
 </style></head><body>
 <div class="bar">
   <h1>Print a gift card</h1>
-  <div class="tabs"><a href="{{ url_for('pass_card', code=p.code, style='folded') }}" class="{{ 'on' if style == 'folded' }}">Folded card</a>
-    <a href="{{ url_for('pass_card', code=p.code, style='flat') }}" class="{{ 'on' if style == 'flat' }}">Flat card</a></div>
+  {% if sample %}<div style="background:#FFF4D6;border-radius:10px;padding:8px 12px;font-weight:700">Sample card with made-up details. The QR code here doesn't open anything.</div>{% endif %}
+  <div class="tabs"><a href="{{ url_for('gift_card_sample', style='folded') if sample else url_for('pass_card', code=p.code, style='folded') }}" class="{{ 'on' if style == 'folded' }}">Folded card</a>
+    <a href="{{ url_for('gift_card_sample', style='flat') if sample else url_for('pass_card', code=p.code, style='flat') }}" class="{{ 'on' if style == 'flat' }}">Flat card</a></div>
   <div class="grid">
     <label>To <input type="text" data-fill="to" value="{{ to }}" maxlength="60" placeholder="Leave blank to write it in"></label>
     <label>From <input type="text" data-fill="from" value="{{ frm }}" maxlength="60" placeholder="Leave blank to write it in"></label>
@@ -74,14 +76,14 @@ ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
 {% if style == 'folded' %}
 <div class="sheet folded" data-sheet>
   <div class="panel back flip">{{ lamb('1.1in') }}<div class="farm">Gooseberry Bridge Farm</div><div class="small">Rogersville, Missouri<br>{{ site }}</div></div>
-  <div class="panel cover flip">{{ lamb('2.5in') }}<div class="big">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
+  <div class="panel cover flip">{% if SS.gift_card_photo %}<img class="coverphoto" src="{{ url_for('photo', name=SS.gift_card_photo) }}" alt="" style="height:3.3in">{% else %}{{ lamb('2.5in') }}{% endif %}<div class="big">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
   <div class="panel" style="justify-content:center;gap:.2in">{{ names() }}<div><div class="notehead">A note:</div><div class="note" data-show="note"></div></div></div>
   <div class="panel" style="justify-content:center">{{ gift() }}{{ qrbox() }}<div class="small">Or go to {{ site }} and enter the code when you book.</div></div>
   <div class="foldh"></div><div class="foldv"></div>
 </div>
 {% else %}
 <div class="sheet flat" data-sheet>
-  <div class="panel cover">{{ lamb('2.2in') }}<div class="big" style="font-size:26pt">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
+  <div class="panel cover">{% if SS.gift_card_photo %}<img class="coverphoto" src="{{ url_for('photo', name=SS.gift_card_photo) }}" alt="" style="height:3.1in">{% else %}{{ lamb('2.2in') }}{% endif %}<div class="big" style="font-size:26pt">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
   <div class="panel" style="justify-content:center;gap:.12in">{{ names() }}
     <div class="note" data-show="note" style="min-height:0;font-size:16pt;line-height:.34in;background:none"></div>
     <div style="display:flex;gap:.2in;align-items:center"><div style="flex:1;display:flex;flex-direction:column;gap:.06in">{{ gift() }}</div>

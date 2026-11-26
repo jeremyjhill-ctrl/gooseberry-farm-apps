@@ -211,6 +211,29 @@ check("pass page links the gift cards", "/shop/pass/{}/card/folded".format(P) in
 mail = " ".join(x["body"] for x in q("SELECT body FROM outbox WHERE recipient='ann@example.com'"))
 check("receipt links a gift card for each gift pass", "Giving it to The Miller family? Print a gift card" in mail and "/shop/pass/{}/card/folded".format(P) in mail)
 
+
+# Staci's own picture on the front (Nov 26, 2026)
+PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+LAMB = 'viewBox="0 0 220 170"'
+check("cards start with the drawn lamb", body(guest.get("/shop/pass/{}/card/flat".format(P))).count(LAMB) == 1)
+guest.post("/shop/admin/settings/gift-card", data={"photo_data": PNG})
+check("only staff can change the gift card picture", not q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")
+      or json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"]) == "")
+check("staff see a sample card; customers don't", "Sample card" in body(c.get("/shop/admin/gift-card-sample"))
+      and "Sample card" not in body(guest.get("/shop/admin/gift-card-sample")))
+c.post("/shop/admin/settings/gift-card", data={"photo_data": PNG})
+pic = json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"])
+hf, hl = body(guest.get("/shop/pass/{}/card/folded".format(P))), body(guest.get("/shop/pass/{}/card/flat".format(P)))
+check("Staci's picture replaces the lamb on the front of both cards", pic and 'class="coverphoto" src="/shop/photos/{}"'.format(pic) in hf
+      and 'class="coverphoto"' in hl and hl.count(LAMB) == 0 and hf.count(LAMB) == 1, (pic, hf.count(LAMB), hl.count(LAMB)))
+check("the picture is served", guest.get("/shop/photos/" + pic).status_code == 200)
+check("settings page shows the current picture", "/shop/photos/" + pic in body(c.get("/shop/admin/settings")))
+r = c.post("/shop/admin/settings/gift-card", data={"photo_data": ""}, follow_redirects=True)
+check("saving with no photo chosen says so and keeps the picture", "Choose a photo first" in body(r)
+      and json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"]) == pic)
+c.post("/shop/admin/settings/gift-card", data={"remove": "1"})
+check("going back to the lamb", body(guest.get("/shop/pass/{}/card/flat".format(P))).count(LAMB) == 1
+      and 'class="coverphoto"' not in body(guest.get("/shop/pass/{}/card/flat".format(P))))
 # ---------------------------------------------------------------- two passes, two people, one checkout
 c.post("/shop/admin/products/new?kind=pass", data={"name": "Duo pass", "price": "20", "cq_0": "1", "ct_0": str(PLAY),
                                                    "season_label": "Good in 2027"})
