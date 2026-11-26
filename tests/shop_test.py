@@ -178,6 +178,7 @@ r = guest.get("/shop/checkout")
 check("checkout is one order form: buyer, who the pass is for, shipping, order, terms",
       [x in body(r) for x in ("Your information", "Who the pass is for", "Someone else (a gift)", "Ship to", "Your order", "Terms")] == [True] * 6
       and body(r).index("Your information") < body(r).index("Who the pass is for") < body(r).index("Terms"))
+check("checkout asks for the gift name exactly as it should appear", "Type it exactly as it should appear on the pass and gift card" in body(r))
 check("checkout says passes go to the buyer, not the gift recipient", "emailed to you (not to the person you" in body(r))
 check("neither Me nor Someone else is picked for you", not re.search(r'name="owner_[^"]+" value="(me|gift)" required checked', body(r)))
 r = guest.post("/shop/checkout", data={"name": "Ann Buyer", "email": "ann@example.com"})

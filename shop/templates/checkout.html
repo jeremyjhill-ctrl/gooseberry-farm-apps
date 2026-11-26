@@ -28,7 +28,8 @@
       <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="gift" required {{ 'checked' if who == 'gift' }}> <span>Someone else (a gift)</span></label>
     </div>
     <label data-gift-name {{ 'hidden' if who != 'gift' }}>Their name <input type="text" name="gift_{{ l.key }}" maxlength="80" autocomplete="off"
-      value="{{ f.get('gift_' ~ l.key, l.owner.name) }}" placeholder="e.g. The Miller family"></label>
+      value="{{ f.get('gift_' ~ l.key, l.owner.name) }}" placeholder="e.g. The Miller family">
+      <span class="muted" style="font-weight:600;font-size:14px">Type it exactly as it should appear on the pass and gift card.</span></label>
   </div>
   {% endfor %}
   <p class="muted" style="margin:0;font-size:14px"><b>Passes are emailed to you (not to the person you're giving it to) right after you pay.</b> For a gift, print a gift card from your order page, or forward them the email.</p>
