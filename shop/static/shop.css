@@ -185,3 +185,9 @@ label.inline>span{flex:1 1 auto;min-width:8em}
 .bookplay .btn{flex:0 0 auto}
 button:disabled{opacity:.6;cursor:wait}
 .btn.small{padding:6px 10px;font-size:13px;min-height:0}
+/* checkout as one order form (Nov 26, 2026) */
+.orderform h2{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding-top:14px;border-top:1px solid #EEEFE8}
+.orderform h2:first-child{margin-top:0;padding-top:0;border-top:0}
+.orderform .step{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:15px;flex:none}
+.orderform .sum{display:flex;flex-direction:column;gap:6px}
+.passowner{display:flex;flex-direction:column;gap:8px;background:#F7F5EE;border-radius:12px;padding:12px 14px}

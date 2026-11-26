@@ -150,14 +150,28 @@ r = guest.get("/shop/p/{}".format(bundle["id"]))
 check("bundle page shows what's included and the value", "2 × Playdate" in body(r) and "$150 value" in body(r) and "Add to cart" in body(r))
 
 # ---------------------------------------------------------------- a customer buys
-guest.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 1})
+def add_pass(client, pid, gift="", **kw):
+    """Passes go in the cart one at a time, each saying who it's for (Nov 26, 2026)."""
+    data = {"product_id": pid, "owner": "gift" if gift else "me", "gift_name": gift}
+    data.update(kw)
+    return client.post("/shop/cart/add", data=data)
+
+
+h = body(guest.get("/shop/p/{}".format(bundle["id"])))
+check("pass page asks who it's for, with no 'How many'", "Who is this pass for?" in h and 'name="qty"' not in h and "Add each pass separately" in h)
+r = guest.post("/shop/cart/add", data={"product_id": bundle["id"]}, follow_redirects=True)
+check("a pass needs to say who it's for", "choose who this pass is for" in body(r) and "Your cart is empty" in body(guest.get("/shop/cart")))
+r = add_pass(guest, bundle["id"], gift=" ", owner="gift")
+check("a gift needs the person's name", "Your cart is empty" in body(guest.get("/shop/cart")))
+add_pass(guest, bundle["id"], gift="The Miller family")
 guest.post("/shop/cart/add", data={"product_id": book["id"], "qty": 1})
 r = guest.get("/shop/checkout")
-check("checkout asks who the pass is for", "a gift for" in body(r) and "Ship to" in body(r))
+check("checkout is one order form: buyer, who the pass is for, shipping, order, terms",
+      [x in body(r) for x in ("Your information", "Who the pass is for", 'value="The Miller family"', "Ship to", "Your order", "Terms")] == [True] * 6
+      and body(r).index("Your information") < body(r).index("Who the pass is for") < body(r).index("Terms"))
 r = guest.post("/shop/checkout", data={"name": "Ann Buyer", "email": "ann@example.com"})
 check("terms and address required", "agree to the terms" in body(r) and "shipping address" in body(r))
 r = guest.post("/shop/checkout", data={"name": "Ann Buyer", "email": "ann@example.com", "agree": "on",
-                                       "gift_{}_0".format(bundle["id"]): "The Miller family",
                                        "ship_line1": "1 Main St", "ship_city": "Topeka", "ship_state": "ks", "ship_zip": "66601"})
 check("order created", "/shop/pay/" in loc(r), loc(r))
 ocode = loc(r).rstrip("/").split("/")[-1]
@@ -182,11 +196,61 @@ check("guests don't see staff buttons", "Farm use" not in body(r))
 check("printable certificate", guest.get("/shop/pass/{}/print".format(P)).status_code == 200)
 check("pass link works with the dash", guest.get("/shop/pass/{}-{}".format(P[:4], P[4:])).status_code == 302)
 
+# ---------------------------------------------------------------- gift cards to print (Nov 26, 2026)
+h = body(guest.get("/shop/order/" + ocode))
+check("order page offers both gift cards for a gift pass", "Print a gift card for The Miller family" in h
+      and "/shop/pass/{}/card/folded".format(P) in h and "/shop/pass/{}/card/flat".format(P) in h)
+for style in ("folded", "flat"):
+    h = body(guest.get("/shop/pass/{}/card/{}".format(P, style)))
+    check("{} gift card: To and From filled in, real QR and code, what's included".format(style),
+          'data-fill="to" value="The Miller family"' in h and 'data-fill="from" value="Ann Buyer"' in h and "<svg" in h
+          and P[:4] in h and "2 × Playdate" in h and "A gift for you" in h)
+check("gift card has no greeting printed (Jeremy's choice)", "Merry Christmas" not in body(guest.get("/shop/pass/{}/card/folded".format(P))))
+check("an unknown card style is not found", guest.get("/shop/pass/{}/card/poster".format(P)).status_code == 404)
+check("pass page links the gift cards", "/shop/pass/{}/card/folded".format(P) in body(guest.get("/shop/pass/" + P)))
+mail = " ".join(x["body"] for x in q("SELECT body FROM outbox WHERE recipient='ann@example.com'"))
+check("receipt links a gift card for each gift pass", "Giving it to The Miller family? Print a gift card" in mail and "/shop/pass/{}/card/folded".format(P) in mail)
+
+# ---------------------------------------------------------------- two passes, two people, one checkout
+c.post("/shop/admin/products/new?kind=pass", data={"name": "Duo pass", "price": "20", "cq_0": "1", "ct_0": str(PLAY),
+                                                   "season_label": "Good in 2027"})
+DUO = q("SELECT id FROM shop_products WHERE name='Duo pass'")[0]["id"]
+rem = Client(wsgi.application)
+add_pass(rem, DUO, gift="Someone")
+k = re.findall(r'name="qty_({}:[0-9a-f]{{8}})"'.format(DUO), body(rem.get("/shop/cart")))[0]
+rem.post("/shop/cart/update", data={"qty_" + k: "3"})
+check("a pass line can't be turned into several", body(rem.get("/shop/cart")).count("A gift for Someone") == 1
+      and "$20" in body(rem.get("/shop/cart")) and "$60" not in body(rem.get("/shop/cart")))
+rem.post("/shop/cart/update", data={"qty_" + k: "0"})
+check("Remove takes a pass out of the cart", "Your cart is empty" in body(rem.get("/shop/cart")))
+duo = Client(wsgi.application)
+add_pass(duo, DUO, gift="Aunt May")
+add_pass(duo, DUO)
+h = body(duo.get("/shop/cart"))
+keys = re.findall(r'name="qty_({}:[0-9a-f]{{8}})"'.format(DUO), h)
+check("each pass is its own cart line with its owner and a Remove button", len(keys) == 2 and "A gift for Aunt May" in h and "For you" in h
+      and h.count(">Remove</button>") == 2, keys)
+r = duo.post("/shop/checkout", data={"name": "Dee Duo", "email": "dee@example.com", "agree": "on",
+                                     "owner_" + keys[0]: "gift", "gift_" + keys[0]: "",
+                                     "owner_" + keys[1]: "gift", "gift_" + keys[1]: "Uncle Ray"})
+check("a gift left without a name at checkout is caught", "name of the person getting" in body(r) and "/shop/pay/" not in loc(r))
+check("two of the same pass: its terms show once", body(r).count("Duo pass: Good in 2027") == 1, body(r).count("Duo pass: Good in 2027"))
+r = duo.post("/shop/checkout", data={"name": "Dee Duo", "email": "dee@example.com", "agree": "on",
+                                     "owner_" + keys[0]: "me", "gift_" + keys[0]: "",
+                                     "owner_" + keys[1]: "gift", "gift_" + keys[1]: "Uncle Ray"})
+dcode = loc(r).rstrip("/").split("/")[-1]
+duo.post("/shop/pay/" + dcode, data={"card": "4242 4242 4242 4242"})
+made = q("SELECT p.gift_for, p.holder FROM shop_passes p JOIN shop_orders o ON o.id = p.order_id WHERE o.code=? ORDER BY p.id", dcode)
+check("owners changed at checkout are what the passes get", sorted(m["gift_for"] for m in made) == ["", "Uncle Ray"]
+      and all(m["holder"] == "Dee Duo" for m in made), made)
+
 # stock limit: 3 bundles; one sold
 guest2 = Client(wsgi.application)
-guest2.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 5})
+for _ in range(3):
+    add_pass(guest2, bundle["id"], qty=5)
 r = guest2.get("/shop/cart")
-check("cart capped at what's left", 'value="2" selected' in body(r), re.findall(r'value="\d+" selected', body(r)))
+check("passes go in one per line, capped at what's left", body(r).count("For you") == 2 and 'name="qty_{}"'.format(bundle["id"]) not in body(r),
+      body(r).count("For you"))
 
 # ---------------------------------------------------------------- an item the buyer can have shipped or pick up
 check("bundle page says electronic delivery", "Electronic delivery" in body(guest.get("/shop/p/{}".format(bundle["id"]))))
@@ -478,7 +542,7 @@ check("with the shop hidden too, the booking message has no button at all", "Vis
       and not re.search(r'<a class="btn" href="[^"]*">\s*</a>', h) and "isn" in h, h[-400:])
 c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "0"})
 bea = Client(wsgi.application)
-bea.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 1})
+add_pass(bea, bundle["id"])
 r = bea.post("/shop/checkout", data={"name": "Bea Buyer", "email": "bea@example.com", "agree": "on"})
 bcode = loc(r).rstrip("/").split("/")[-1]
 bea.post("/shop/pay/" + bcode, data={"card": "4242 4242 4242 4242"})
@@ -512,7 +576,7 @@ later = (dt.datetime.now() + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
 c.post("/shop/admin/pages", data={"id": page["id"], "title": "Black Friday 2026", "slug": "black-friday-2026", "starts_at": later})
 r = guest.get("/shop/s/black-friday-2026")
 check("upcoming sale shows when it opens", "This sale opens" in body(r))
-r = guest.post("/shop/cart/add", data={"product_id": bundle["id"], "qty": 1}, follow_redirects=True)
+r = guest.post("/shop/cart/add", data={"product_id": bundle["id"], "owner": "me"}, follow_redirects=True)
 check("can't buy before the sale opens", "available right now" in body(r))
 earlier = (dt.datetime.now() - dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
 c.post("/shop/admin/pages", data={"id": page["id"], "title": "Black Friday 2026", "slug": "black-friday-2026", "starts_at": "", "ends_at": earlier})
@@ -556,7 +620,7 @@ c.post("/shop/admin/visibility", data={"which": "shop", "hidden": "0"})
 c.post("/shop/admin/products/new?kind=pass", data={"name": "Test-order pass", "price": "20", "cq_0": "1", "ct_0": str(PLAY)})
 TP = q("SELECT id FROM shop_products WHERE name='Test-order pass'")[0]["id"]
 g9 = Client(wsgi.application)
-g9.post("/shop/cart/add", data={"product_id": TP, "qty": 1})
+add_pass(g9, TP)
 r = g9.post("/shop/checkout", data={"name": "Tess Test", "email": "tess@example.com", "agree": "on",
                                     "ship_line1": "1 Main St", "ship_city": "Ozark", "ship_state": "MO", "ship_zip": "65721"})
 tcode = loc(r).rstrip("/").split("/")[-1]

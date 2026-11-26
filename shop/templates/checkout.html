@@ -1,49 +1,51 @@
 {% extends "base.html" %}
 {% block title %}Checkout{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
-{% block body %}
+{% block body %}{% from '_answers.html' import show_answers %}
+{# One order form, top to bottom: who's buying, who each pass is for, shipping, the total, terms, pay (Nov 26, 2026). #}
 <a href="{{ url_for('cart_view') }}" style="font-weight:700;text-decoration:none">‹ Back to cart</a>
+<h1>Checkout</h1>
 {% for e in errors %}<div class="flash" style="border-color:var(--red)">{{ e }}</div>{% endfor %}
-<section class="card sum">
-  <h2>Your order</h2>
-  {% from '_answers.html' import show_answers %}
-  {% for l in lines %}<div><span>{{ l.qty }} × {{ l.product.name }}{{ show_answers(l) }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
-  {% macro tail(x) %}
-    {% if x.ships %}<div><span>Shipping</span><span>{{ money(x.shipping) }}</span></div>{% endif %}
-    <div><span>Sales tax</span><span>{{ money(x.tax) }}</span></div>
-    <div class="total"><span>Total</span><span>{{ money(x.total) }}</span></div>
-  {% endmacro %}
-  {% if t.choice %}
-    <div data-how-sum="" style="display:contents" {{ 'hidden' if t.how }}><div class="muted"><span>Shipping {{ money(t.flat) }}, or free if you pick it up at the farm. Choose below to see your total.</span><span></span></div></div>
-    {% for h, x in both_ways.items() %}<div data-how-sum="{{ h }}" style="display:contents" {{ 'hidden' if t.how != h }}>{{ tail(x) }}</div>{% endfor %}
-  {% else %}{{ tail(t) }}{% endif %}
-  {% if t.ships or t.choice %}<div class="muted" data-ship-only {{ 'hidden' if t.choice and not t.ships }}><span>Shipping out of Missouri? Tax comes off the shipped items once you enter your state.</span><span></span></div>{% endif %}
-  {% if lines|selectattr('product.kind', 'equalto', 'pass')|list %}<div class="muted"><span><b>Passes: electronic delivery.</b> Emailed right after you pay.</span><span></span></div>{% endif %}
-</section>
-<form method="post" class="card">
-  <h2>Your details</h2>
+{% set passes = lines|selectattr('product.kind', 'equalto', 'pass')|list %}
+{% set n = namespace(step=0) %}
+<form method="post" class="card orderform">
+  {% set n.step = n.step + 1 %}
+  <h2><span class="step">{{ n.step }}</span> Your information</h2>
   <label>Name <input type="text" name="name" autocomplete="name" value="{{ f.get('name', '') }}" required></label>
-  <label>Email <input type="email" name="email" autocomplete="email" value="{{ f.get('email', '') }}" required></label>
-  <label>Mobile phone (optional) <input type="tel" name="phone" autocomplete="tel" value="{{ f.get('phone', '') }}"></label>
+  <label>Email <input type="email" name="email" autocomplete="email" value="{{ f.get('email', '') }}" required>
+    <span class="muted" style="font-weight:600;font-size:14px">Your receipt{{ ' and passes' if passes }} go here.</span></label>
+  <label>Mobile phone <span class="muted" style="font-weight:600">(optional)</span> <input type="tel" name="phone" autocomplete="tel" value="{{ f.get('phone', '') }}"></label>
+
+  {% if passes %}
+  {% set n.step = n.step + 1 %}
+  <h2><span class="step">{{ n.step }}</span> Who the pass{{ 'es are' if passes|length > 1 else ' is' }} for</h2>
+  {% for l in passes %}
+  {% set who = f.get('owner_' ~ l.key, 'gift' if l.owner.gift else 'me') %}
+  <div class="passowner" data-owner-box>
+    <b>{{ l.product.name }}{% if passes|length > 1 %} <span class="muted" style="font-weight:600">#{{ loop.index }}</span>{% endif %}</b>
+    <div class="row" style="gap:16px">
+      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="me" {{ 'checked' if who == 'me' }}> <span>For me</span></label>
+      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="gift" {{ 'checked' if who == 'gift' }}> <span>A gift</span></label>
+    </div>
+    <label data-gift-name {{ 'hidden' if who != 'gift' }}>Their name <input type="text" name="gift_{{ l.key }}" maxlength="80" autocomplete="off"
+      value="{{ f.get('gift_' ~ l.key, l.owner.name) }}" placeholder="e.g. The Miller family"></label>
+  </div>
+  {% endfor %}
+  <p class="muted" style="margin:0;font-size:14px">Passes are delivered electronically, emailed right after you pay. For gifts, you can print a gift card from your order page.</p>
+  {% endif %}
+
   {% if t.choice %}
-  <h2 style="margin-top:6px">Shipping or pickup?</h2>
+  {% set n.step = n.step + 1 %}
+  <h2><span class="step">{{ n.step }}</span> Shipping or pickup</h2>
   <p class="muted" style="margin:0">For {{ choosers|join(', ') }}:</p>
   <label class="inline"><input type="radio" name="how" value="ship" required {{ 'checked' if t.how == 'ship' }}> <span>Ship it to me (+{{ money(t.flat) }})</span></label>
   <label class="inline"><input type="radio" name="how" value="pickup" required {{ 'checked' if t.how == 'pickup' }}> <span>I'll pick it up at the farm (free)</span></label>
   {% endif %}
-  {% set passes = lines|selectattr('product.kind', 'equalto', 'pass')|list %}
-  {% if passes %}
-  <h2 style="margin-top:6px">Who are the passes for?</h2>
-  <p class="muted" style="margin:0">Giving one as a gift? Put their name and it'll show on the pass and the printable certificate. Leave it blank if it's for you.</p>
-  {% for l in passes %}{% for i in range(l.qty) %}
-  <label>{{ l.product.name }}{% if l.qty > 1 %} #{{ i + 1 }}{% endif %}: a gift for (optional)
-    <input type="text" name="gift_{{ l.key }}_{{ i }}" value="{{ f.get('gift_%s_%s'|format(l.key, i), '') }}" placeholder="e.g. The Miller family"></label>
-  {% endfor %}{% endfor %}
-  {% endif %}
   {% if t.ships or t.choice %}
   <div id="shipto" style="display:flex;flex-direction:column;gap:12px" {{ 'hidden' if not t.ships }}>
-  <h2 style="margin-top:6px">Ship to</h2>
-  <label>Name <input type="text" name="ship_name" autocomplete="shipping name" value="{{ f.get('ship_name', '') }}"></label>
+  {% if not t.choice %}{% set n.step = n.step + 1 %}{% endif %}
+  <h2>{% if not t.choice %}<span class="step">{{ n.step }}</span> {% endif %}Ship to</h2>
+  <label>Name <input type="text" name="ship_name" autocomplete="shipping name" value="{{ f.get('ship_name', '') }}" placeholder="Leave blank to use your name"></label>
   <label>Street address <input type="text" name="ship_line1" autocomplete="shipping address-line1" value="{{ f.get('ship_line1', '') }}"></label>
   <label>Apt, suite (optional) <input type="text" name="ship_line2" autocomplete="shipping address-line2" value="{{ f.get('ship_line2', '') }}"></label>
   <div class="grid" style="grid-template-columns:2fr 1fr 1fr">
@@ -53,26 +55,54 @@
   </div>
   </div>
   {% endif %}
-  <h2 style="margin-top:6px">Terms</h2>
+
+  {% set n.step = n.step + 1 %}
+  <h2><span class="step">{{ n.step }}</span> Your order</h2>
+  <div class="sum">
+  {% for l in lines %}<div><span>{% if l.qty > 1 %}{{ l.qty }} × {% endif %}{{ l.product.name }}{% if l.product.kind == 'pass' %} <span class="muted">({{ 'gift for ' ~ l.owner.name if l.owner.gift else 'for you' }})</span>{% endif %}{{ show_answers(l) }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
+  {% macro tail(x) %}
+    {% if x.ships %}<div><span>Shipping</span><span>{{ money(x.shipping) }}</span></div>{% endif %}
+    <div><span>Sales tax</span><span>{{ money(x.tax) }}</span></div>
+    <div class="total"><span>Total</span><span>{{ money(x.total) }}</span></div>
+  {% endmacro %}
+  {% if t.choice %}
+    <div data-how-sum="" style="display:contents" {{ 'hidden' if t.how }}><div class="muted"><span>Shipping {{ money(t.flat) }}, or free if you pick it up at the farm. Choose above to see your total.</span><span></span></div></div>
+    {% for h, x in both_ways.items() %}<div data-how-sum="{{ h }}" style="display:contents" {{ 'hidden' if t.how != h }}>{{ tail(x) }}</div>{% endfor %}
+  {% else %}{{ tail(t) }}{% endif %}
+  {% if t.ships or t.choice %}<div class="muted" data-ship-only {{ 'hidden' if t.choice and not t.ships }}><span>Shipping out of Missouri? Tax comes off the shipped items once you enter your state.</span><span></span></div>{% endif %}
+  </div>
+
+  {% set n.step = n.step + 1 %}
+  <h2><span class="step">{{ n.step }}</span> Terms</h2>
   {% for para in terms %}<p style="margin:0;font-size:14px">{{ para }}</p>{% endfor %}
   <label class="inline"><input type="checkbox" name="agree" required {{ 'checked' if f.get('agree') }}> <span><strong>I agree to these terms</strong></span></label>
   <button class="btn big">Continue to payment</button>
   <div class="muted">We'll hold these for 30 minutes while you pay.</div>
 </form>
-{% if t.choice %}
 <script>
 (function () {
+  // Each pass: show "Their name" only for a gift.
+  document.querySelectorAll('[data-owner-box]').forEach(function (box) {
+    var name = box.querySelector('[data-gift-name]'), input = name.querySelector('input');
+    function show() {
+      var gift = box.querySelector('input[value=gift]').checked;
+      name.hidden = !gift; input.required = gift;
+    }
+    box.querySelectorAll('input[type=radio]').forEach(function (r) { r.addEventListener('change', show); });
+    show();
+  });
+  {% if t.choice %}
   var shipAlways = {{ 'true' if t.ship_always else 'false' }};
-  function show() {
+  function showHow() {
     var r = document.querySelector('input[name=how]:checked'), how = r ? r.value : '';
     document.querySelectorAll('[data-how-sum]').forEach(function (e) { e.hidden = e.getAttribute('data-how-sum') !== how; });
     var ships = shipAlways || how === 'ship';
     document.getElementById('shipto').hidden = !ships;
     document.querySelectorAll('[data-ship-only]').forEach(function (e) { e.hidden = !ships; });
   }
-  document.querySelectorAll('input[name=how]').forEach(function (r) { r.addEventListener('change', show); });
-  show();
+  document.querySelectorAll('input[name=how]').forEach(function (r) { r.addEventListener('change', showHow); });
+  showHow();
+  {% endif %}
 })();
 </script>
-{% endif %}
 {% endblock %}

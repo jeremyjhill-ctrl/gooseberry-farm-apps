@@ -208,7 +208,11 @@ def start(email, items=((PASS, 1),), ship=False, who=None):
     """A buyer fills the cart and the checkout form; returns (their browser, order code)."""
     g = who or Client(wsgi.application)
     for pid, n in items:
-        g.post("/shop/cart/add", data={"product_id": pid, "qty": n})
+        if pid == PASS:  # passes go in one at a time, each saying who it's for (Nov 26, 2026)
+            for _ in range(n):
+                g.post("/shop/cart/add", data={"product_id": pid, "owner": "me"})
+        else:
+            g.post("/shop/cart/add", data={"product_id": pid, "qty": n})
     data = {"name": "Buyer " + email.split("@")[0], "email": email, "agree": "on"}
     if ship:
         data.update(ship_line1="1 Main St", ship_city="Rogersville", ship_state="MO", ship_zip="65742")
@@ -235,7 +239,9 @@ check("pay sends the buyer to Stripe's page", r.status_code == 302 and loc(r) ==
 check("Stripe is asked for exactly the order total", SESSIONS["cs_test_1"]["amount_total"] == round(o1["total"] * 100) and o1["total"] > 0,
       (SESSIONS["cs_test_1"]["amount_total"], o1["total"]))
 names = [x["price_data"]["product_data"]["name"] for x in call.get("line_items", [])]
-check("Stripe's page lists the items, shipping and tax", names == ["Spring Family Pass", "Signed book", "Shipping", "Sales tax"], names)
+check("Stripe's page lists the items, shipping and tax", names == ["Spring Family Pass", "Spring Family Pass", "Signed book", "Shipping", "Sales tax"], names)
+check("...each pass saying who it's for", [x["price_data"]["product_data"].get("description") for x in call.get("line_items", [])][:2] == ["For you", "For you"],
+      [x["price_data"]["product_data"].get("description") for x in call.get("line_items", [])])
 check("Stripe call leaves payment methods to the Dashboard, in dollars, with the buyer's email", "payment_method_types" not in call
       and all(x["price_data"]["currency"] == "usd" for x in call["line_items"]) and call.get("customer_email") == "ann@example.com")
 check("Stripe knows which order it is", call.get("metadata", {}).get("order") == c1 and call.get("client_reference_id") == c1
@@ -406,7 +412,7 @@ check("...and both land on it", len(set(follow)) == 1 and follow[0].startswith("
 # ---------------------------------------------------------------- 8. test-buying while the shop is hidden
 staff.post("/shop/admin/visibility", data={"which": "shop", "hidden": "1"})
 guest = Client(wsgi.application)
-guest.post("/shop/cart/add", data={"product_id": PASS, "qty": 1})
+guest.post("/shop/cart/add", data={"product_id": PASS, "owner": "me"})
 check("customers can't check out while hidden", "The shop is closed" in body(guest.get("/shop/checkout")))
 gj, cj = start("jeremy@example.com", who=staff)
 r = staff.get("/shop/pay/" + cj)

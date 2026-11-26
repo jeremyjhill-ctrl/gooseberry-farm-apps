@@ -9,10 +9,16 @@
 <form method="post" action="{{ url_for('cart_update') }}" class="card">
   {% for l in lines %}
   <div class="row between" style="border-bottom:1px solid #EEEFE8;padding-bottom:10px">
-    <div><b>{{ l.product.name }}</b><div class="muted">{{ money(l.product.price) }} each{% if not l.product.buyable %} · <span style="color:var(--red)">not available right now</span>{% endif %}</div>{{ show_answers(l) }}</div>
+    <div><b>{{ l.product.name }}</b>
+      {% if l.product.kind == 'pass' %}<div style="font-weight:700">{{ 'A gift for ' ~ l.owner.name if l.owner.gift else 'For you' }}</div>{% endif %}
+      <div class="muted">{{ money(l.product.price) }}{{ '' if l.product.kind == 'pass' else ' each' }}{% if not l.product.buyable %} · <span style="color:var(--red)">not available right now</span>{% endif %}</div>{{ show_answers(l) }}</div>
     <div class="row" style="gap:8px">
+      {% if l.product.kind == 'pass' %}
+      <button class="btn ghost small" name="qty_{{ l.key }}" value="0">Remove</button>
+      {% else %}
       <select name="qty_{{ l.key }}" onchange="this.form.submit()" aria-label="How many {{ l.product.name }}">
         {% for n in range(0, ([l.product.per_order_limit or 10, 10]|min) + 1) %}<option value="{{ n }}" {{ 'selected' if n == l.qty }}>{{ 'Remove' if n == 0 else n }}</option>{% endfor %}</select>
+      {% endif %}
       <b style="min-width:70px;text-align:right">{{ money(l.amount) }}</b>
     </div>
   </div>

@@ -311,19 +311,26 @@ def create_app():
     def cart_answers():
         return session.get("cart_answers") or {}
 
+    def cart_owners():
+        """Who each pass in the cart is for: {key: {"gift": bool, "name": "The Miller family"}}."""
+        return session.get("cart_owners") or {}
+
     def pid_of(key):
         return int(str(key).split(":")[0])
 
     def cart_lines():
         lines = []
-        answers = cart_answers()
+        answers, owners = cart_answers(), cart_owners()
         for key, qty in cart().items():
             p = row("SELECT * FROM shop_products WHERE id=?", pid_of(key))
             if not p:
                 continue
             p = decorate(p)
+            if p["kind"] == "pass":
+                qty = 1  # each pass is its own line, with its own owner (Nov 26, 2026)
+            owner = owners.get(key) or {"gift": False, "name": ""}
             lines.append({"key": key, "product": p, "qty": qty, "amount": round(float(p["price"]) * qty, 2),
-                          "answers": answers.get(key, [])})
+                          "answers": answers.get(key, []), "owner": owner})
         return lines
 
     def questions(p):
@@ -527,6 +534,19 @@ def create_app():
         if not p["buyable"]:
             flash("Sorry, {} isn't available right now.".format(p["name"]))
             return redirect(url_for("product", pid=pid))
+        owner = None
+        if p["kind"] == "pass":
+            # Passes are added one at a time, each saying who it's for.
+            qty = 1
+            who = request.form.get("owner", "")
+            gift_name = request.form.get("gift_name", "").strip()[:80]
+            if who not in ("me", "gift"):
+                flash("Please choose who this pass is for.")
+                return redirect(url_for("product", pid=pid))
+            if who == "gift" and not gift_name:
+                flash("Please add the name of the person you're giving it to.")
+                return redirect(url_for("product", pid=pid))
+            owner = {"gift": who == "gift", "name": gift_name if who == "gift" else ""}
         answers, missing = [], []
         for i, q in enumerate(questions(p)):
             a = request.form.get("answer_{}".format(i), "").strip()[:MAX_ANSWER]
@@ -537,9 +557,13 @@ def create_app():
         if missing:
             flash("Please answer: {}".format("; ".join(missing)))
             return redirect(url_for("product", pid=pid))
-        # The same item with different answers (say, two books inscribed differently) is its own cart line.
-        key = str(pid) if not answers else "{}:{}".format(
-            pid, hashlib.sha1(json.dumps(answers, sort_keys=True).encode()).hexdigest()[:8])
+        # The same item with different answers (say, two books inscribed differently) is its own cart line,
+        # and so is every pass.
+        if owner is not None:
+            key = "{}:{}".format(pid, secrets.token_hex(4))
+        else:
+            key = str(pid) if not answers else "{}:{}".format(
+                pid, hashlib.sha1(json.dumps(answers, sort_keys=True).encode()).hexdigest()[:8])
         c = cart()
         others = sum(n for k, n in c.items() if pid_of(k) == pid and k != key)
         want = c.get(key, 0) + qty
@@ -556,6 +580,12 @@ def create_app():
             saved = cart_answers()
             saved[key] = answers
             session["cart_answers"] = saved
+        if owner is not None:
+            owners = cart_owners()
+            owners[key] = owner
+            session["cart_owners"] = owners
+            flash("Added {} {} to your cart.".format(p["name"], "for " + owner["name"] if owner["gift"] else "for you"))
+            return redirect(url_for("cart_view"))
         flash("Added {} to your cart.".format(p["name"]))
         return redirect(url_for("cart_view"))
 
@@ -565,10 +595,12 @@ def create_app():
         for key in list(c):
             v = request.form.get("qty_" + key, type=int)
             if v is not None:
-                p = row("SELECT per_order_limit FROM shop_products WHERE id=?", pid_of(key))
-                c[key] = max(0, min(int(p["per_order_limit"]) if p and p["per_order_limit"] else 20, v))
+                p = row("SELECT per_order_limit, kind FROM shop_products WHERE id=?", pid_of(key))
+                most = 1 if p and p["kind"] == "pass" else (int(p["per_order_limit"]) if p and p["per_order_limit"] else 20)
+                c[key] = max(0, min(most, v))
         session["cart"] = {k: v for k, v in c.items() if v > 0}
         session["cart_answers"] = {k: v for k, v in cart_answers().items() if k in session["cart"]}
+        session["cart_owners"] = {k: v for k, v in cart_owners().items() if k in session["cart"]}
         return redirect(url_for("cart_view"))
 
     @app.get("/cart")
@@ -601,6 +633,17 @@ def create_app():
                 errors.append("Please fill in the shipping address.")
             if not f.get("agree"):
                 errors.append("Please agree to the terms.")
+            # Who each pass is for (set on the pass page; can be changed here).
+            owners = cart_owners()
+            for l in lines:
+                if l["product"]["kind"] != "pass":
+                    continue
+                who = f.get("owner_" + l["key"], "gift" if l["owner"]["gift"] else "me")
+                gname = f.get("gift_" + l["key"], l["owner"]["name"]).strip()[:80]
+                l["owner"] = owners[l["key"]] = {"gift": who == "gift", "name": gname if who == "gift" else ""}
+                if who == "gift" and not gname:
+                    errors.append("Please add the name of the person getting the {}.".format(l["product"]["name"]))
+            session["cart_owners"] = owners
             ip = request.remote_addr or ""
             con = db()
             if not errors:
@@ -636,7 +679,7 @@ def create_app():
                         oid = cur.lastrowid
                         for l in lines:
                             p = l["product"]
-                            gifts = [f.get("gift_{}_{}".format(l["key"], i), "").strip() for i in range(l["qty"])] if p["kind"] == "pass" else []
+                            gifts = [l["owner"]["name"]] if p["kind"] == "pass" else []
                             con.execute("""INSERT INTO shop_order_lines(order_id, product_id, kind, name, unit_price, qty, fulfillment, taxable, gift_for,
                                            answers) VALUES (?,?,?,?,?,?,?,?,?,?)""", (oid, p["id"], p["kind"], p["name"], p["price"], l["qty"],
                                                                          how_for(p, how), p["taxable"], json.dumps(gifts),
@@ -654,9 +697,12 @@ def create_app():
                                terms=terms_for(lines, s).split("\n\n"))
 
     def terms_for(lines, s):
-        parts = [s["terms"]]
+        parts, seen = [s["terms"]], set()
         for l in lines:
             p = l["product"]
+            if p["id"] in seen:
+                continue  # two of the same pass: its terms once
+            seen.add(p["id"])
             if p["kind"] == "pass" and (p["season_label"] or p["valid_until"]):
                 bit = "{}: {}".format(p["name"], p["season_label"] or "")
                 if p["valid_until"]:
@@ -757,6 +803,12 @@ def create_app():
         for l in o["lines"]:
             product = {"name": l["name"]}
             said = "; ".join("{}: {}".format(x["q"], x["a"]) for x in answers_of(l))
+            if l.get("kind") == "pass":
+                try:
+                    gift = (json.loads(l.get("gift_for") or "[]") or [""])[0]
+                except (ValueError, TypeError):
+                    gift = ""
+                said = ("A gift for " + gift if gift else "For you") + ("; " + said if said else "")
             if said:
                 product["description"] = said[:400]
             items.append({"quantity": int(l["qty"]), "price_data": {"currency": "usd", "unit_amount": cents(l["unit_price"]),
@@ -920,6 +972,9 @@ def create_app():
             for p in o["passes"]:
                 who = " (for {})".format(p["gift_for"]) if p["gift_for"] else ""
                 lines.append("  {}{}: {}".format(p["title"], who, url_for("pass_page", code=p["code"], _external=True)))
+            for p in [x for x in o["passes"] if x["gift_for"]]:
+                lines += ["", "Giving it to {}? Print a gift card to put under the tree:".format(p["gift_for"]),
+                          "  " + url_for("pass_card", code=p["code"], style="folded", _external=True)]
             if playdate_settings().get("booking_hidden"):
                 lines += ["", "Playdate booking opens soon. When it does, pick a time on our booking page and enter your pass code at checkout:",
                           "  " + booking_url()]
@@ -972,6 +1027,21 @@ def create_app():
     def pass_print(code):
         p = pass_or_404(code)
         return render_template("pass_print.html", p=p, credits=fp.credits(db(), p["id"]),
+                               qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
+
+    @app.get("/pass/<code>/card/<style>")
+    def pass_card(code, style):
+        """A printable gift card for under the tree: folded (one letter sheet, folded in quarters) or flat (half sheet).
+        To, From and a short note are typed on the page before printing; nothing typed there is saved."""
+        if style not in ("folded", "flat"):
+            abort(404)
+        p = pass_or_404(code)
+        if fp.clean_code(code) != code:
+            return redirect(url_for("pass_card", code=p["code"], style=style))
+        credits = [c for c in fp.credits(db(), p["id"]) if c["qty"]]
+        return render_template("gift_card.html", p=p, style=style, credits=credits,
+                               to=p["gift_for"] or p["holder"] or "", frm=p["holder"] if p["gift_for"] else "",
+                               site=request.host + request.script_root,
                                qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
 
     @app.post("/pass/<code>/use")
