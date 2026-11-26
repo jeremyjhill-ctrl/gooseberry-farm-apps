@@ -329,7 +329,7 @@ def create_app():
             p = decorate(p)
             if p["kind"] == "pass":
                 qty = 1  # each pass is its own line, with its own owner (Nov 26, 2026)
-            owner = owners.get(key) or {"gift": False, "name": ""}
+            owner = owners.get(key) or {"gift": None, "name": ""}  # gift None: not chosen yet (asked at checkout)
             lines.append({"key": key, "product": p, "qty": qty, "amount": round(float(p["price"]) * qty, 2),
                           "answers": answers.get(key, []), "owner": owner})
         return lines
@@ -537,17 +537,9 @@ def create_app():
             return redirect(url_for("product", pid=pid))
         owner = None
         if p["kind"] == "pass":
-            # Passes are added one at a time, each saying who it's for.
+            # Passes go in one at a time, each its own line; who each one is for is asked once, at checkout.
             qty = 1
-            who = request.form.get("owner", "")
-            gift_name = request.form.get("gift_name", "").strip()[:80]
-            if who not in ("me", "gift"):
-                flash("Please choose who this pass is for.")
-                return redirect(url_for("product", pid=pid))
-            if who == "gift" and not gift_name:
-                flash("Please add the name of the person you're giving it to.")
-                return redirect(url_for("product", pid=pid))
-            owner = {"gift": who == "gift", "name": gift_name if who == "gift" else ""}
+            owner = {"gift": None, "name": ""}
         answers, missing = [], []
         for i, q in enumerate(questions(p)):
             a = request.form.get("answer_{}".format(i), "").strip()[:MAX_ANSWER]
@@ -585,7 +577,7 @@ def create_app():
             owners = cart_owners()
             owners[key] = owner
             session["cart_owners"] = owners
-            flash("Added {} {} to your cart.".format(p["name"], "for " + owner["name"] if owner["gift"] else "for you"))
+            flash("Added {} to your cart.".format(p["name"]))
             return redirect(url_for("cart_view"))
         flash("Added {} to your cart.".format(p["name"]))
         return redirect(url_for("cart_view"))
@@ -639,10 +631,12 @@ def create_app():
             for l in lines:
                 if l["product"]["kind"] != "pass":
                     continue
-                who = f.get("owner_" + l["key"], "gift" if l["owner"]["gift"] else "me")
+                who = f.get("owner_" + l["key"], "")
                 gname = f.get("gift_" + l["key"], l["owner"]["name"]).strip()[:80]
-                l["owner"] = owners[l["key"]] = {"gift": who == "gift", "name": gname if who == "gift" else ""}
-                if who == "gift" and not gname:
+                l["owner"] = owners[l["key"]] = {"gift": {"me": False, "gift": True}.get(who), "name": gname if who == "gift" else ""}
+                if who not in ("me", "gift"):
+                    errors.append("Please choose who the {} is for.".format(l["product"]["name"]))
+                elif who == "gift" and not gname:
                     errors.append("Please add the name of the person getting the {}.".format(l["product"]["name"]))
             session["cart_owners"] = owners
             ip = request.remote_addr or ""

@@ -15,7 +15,7 @@
     {% endif %}
     {% for para in (p.description or '').split('\n\n') if para %}<p style="margin:0">{{ para }}</p>{% endfor %}
     {% if p.kind == 'pass' %}<p class="muted" style="margin:0">{{ p.season_label }}{% if p.valid_until %} · credits work through {{ nice_day(p.valid_until) }}{% endif %}.</p>
-    <p class="muted" style="margin:0"><b>Electronic delivery.</b> Your pass is emailed right after you pay, with a QR code to show at the farm and a code to book playdates online. Buying it as a gift? Choose “Someone else” below, and after checkout you can print a gift card to put under the tree.</p>
+    <p class="muted" style="margin:0"><b>Electronic delivery.</b> Your pass is emailed right after you pay, with a QR code to show at the farm and a code to book playdates online. Buying it as a gift? Choose “Someone else” at checkout, and afterward you can print a gift card to put under the tree.</p>
     {% elif p.fulfillment == 'ship' %}<p class="muted" style="margin:0">Ships to you: {{ money(p.ship_charge) }} shipping{% if SS.ship_extra_item %}, plus {{ money(SS.ship_extra_item) }} for each extra item in the same order{% endif %}.{% if SS.free_ship_over %} Free shipping on {{ money(SS.free_ship_over) }} or more.{% endif %}</p>
     {% elif p.fulfillment == 'pickup' %}<p class="muted" style="margin:0">Pick up at the farm.</p>
     {% elif p.fulfillment == 'none' %}<p class="muted" style="margin:0"><b>Electronic delivery.</b> Nothing to ship or pick up: the details come in your order email.</p>
@@ -29,26 +29,8 @@
         {% else %}<input type="text" name="answer_{{ loop.index0 }}" maxlength="500" {{ 'required' if q.required }}>{% endif %}</label>
       {% endfor %}
       {% if p.kind == 'pass' %}
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <b style="font-size:17px">Who is this pass for?</b>
-        <label class="inline"><input type="radio" name="owner" value="me" required> <span>Me</span></label>
-        <label class="inline"><input type="radio" name="owner" value="gift" required> <span>Someone else (it's a gift)</span></label>
-        <label data-gift-name>Their name <input type="text" name="gift_name" maxlength="80" autocomplete="off" placeholder="e.g. The Miller family"></label>
-      </div>
       <button class="btn">Add to cart</button>
-      <div class="muted" style="font-size:14px">Buying more than one? Add each pass separately, so each one gets its own name.</div>
-      <script>
-      (function () {
-        var box = document.querySelector('[data-gift-name]'), input = box.querySelector('input');
-        function show() {
-          var gift = document.querySelector('input[name=owner][value=gift]').checked;
-          box.hidden = !gift; input.required = gift;
-          if (gift && document.activeElement && document.activeElement.name === 'owner') input.focus();
-        }
-        document.querySelectorAll('input[name=owner]').forEach(function (r) { r.addEventListener('change', show); });
-        show();
-      })();
-      </script>
+      <div class="muted" style="font-size:14px">Buying more than one? Add it to your cart once for each pass.</div>
       {% else %}
       <div class="row">
         {% if p.one_of_a_kind %}<input type="hidden" name="qty" value="1"><span class="tag unique" style="font-size:14px;padding:6px 12px">One of a kind</span>

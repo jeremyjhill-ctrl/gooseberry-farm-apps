@@ -210,10 +210,12 @@ def start(email, items=((PASS, 1),), ship=False, who=None):
     for pid, n in items:
         if pid == PASS:  # passes go in one at a time, each saying who it's for (Nov 26, 2026)
             for _ in range(n):
-                g.post("/shop/cart/add", data={"product_id": pid, "owner": "me"})
+                g.post("/shop/cart/add", data={"product_id": pid})
         else:
             g.post("/shop/cart/add", data={"product_id": pid, "qty": n})
     data = {"name": "Buyer " + email.split("@")[0], "email": email, "agree": "on"}
+    for k in re.findall(r'name="qty_(\d+:[0-9a-f]{8})"', body(g.get("/shop/cart"))):
+        data.update({"owner_" + k: "me"})  # each pass: who it's for, asked at checkout
     if ship:
         data.update(ship_line1="1 Main St", ship_city="Rogersville", ship_state="MO", ship_zip="65742")
     r = g.post("/shop/checkout", data=data)

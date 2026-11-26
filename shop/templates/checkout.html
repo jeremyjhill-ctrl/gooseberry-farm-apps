@@ -20,12 +20,12 @@
   {% set n.step = n.step + 1 %}
   <h2><span class="step">{{ n.step }}</span> Who the pass{{ 'es are' if passes|length > 1 else ' is' }} for</h2>
   {% for l in passes %}
-  {% set who = f.get('owner_' ~ l.key, 'gift' if l.owner.gift else 'me') %}
+  {% set who = f.get('owner_' ~ l.key, '' if l.owner.gift is none else ('gift' if l.owner.gift else 'me')) %}
   <div class="passowner" data-owner-box>
     <b>{{ l.product.name }}{% if passes|length > 1 %} <span class="muted" style="font-weight:600">#{{ loop.index }}</span>{% endif %}</b>
     <div class="row" style="gap:16px">
-      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="me" {{ 'checked' if who == 'me' }}> <span>For me</span></label>
-      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="gift" {{ 'checked' if who == 'gift' }}> <span>A gift</span></label>
+      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="me" required {{ 'checked' if who == 'me' }}> <span>Me</span></label>
+      <label class="inline"><input type="radio" name="owner_{{ l.key }}" value="gift" required {{ 'checked' if who == 'gift' }}> <span>Someone else (a gift)</span></label>
     </div>
     <label data-gift-name {{ 'hidden' if who != 'gift' }}>Their name <input type="text" name="gift_{{ l.key }}" maxlength="80" autocomplete="off"
       value="{{ f.get('gift_' ~ l.key, l.owner.name) }}" placeholder="e.g. The Miller family"></label>
@@ -59,7 +59,7 @@
   {% set n.step = n.step + 1 %}
   <h2><span class="step">{{ n.step }}</span> Your order</h2>
   <div class="sum">
-  {% for l in lines %}<div><span>{% if l.qty > 1 %}{{ l.qty }} × {% endif %}{{ l.product.name }}{% if l.product.kind == 'pass' %} <span class="muted">({{ 'gift for ' ~ l.owner.name if l.owner.gift else 'for you' }})</span>{% endif %}{{ show_answers(l) }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
+  {% for l in lines %}<div><span>{% if l.qty > 1 %}{{ l.qty }} × {% endif %}{{ l.product.name }}{% if l.product.kind == 'pass' and l.owner.gift is not none %} <span class="muted">({{ 'gift for ' ~ l.owner.name if l.owner.gift else 'for you' }})</span>{% endif %}{{ show_answers(l) }}</span><span>{{ money(l.amount) }}</span></div>{% endfor %}
   {% macro tail(x) %}
     {% if x.ships %}<div><span>Shipping</span><span>{{ money(x.shipping) }}</span></div>{% endif %}
     <div><span>Sales tax</span><span>{{ money(x.tax) }}</span></div>
