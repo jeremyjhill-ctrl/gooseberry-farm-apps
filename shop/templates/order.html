@@ -16,9 +16,7 @@
     <div><b>{{ p.title }}</b>{% if p.gift_for %}<div class="muted">A gift for {{ p.gift_for }}</div>{% endif %}<div class="code">{{ pretty_code(p.code) }}</div></div>
     <div class="row"><a class="btn" href="{{ url_for('pass_page', code=p.code) }}">Open pass</a></div>
   </div>
-  {% if p.gift_for %}<div class="row" style="gap:8px;align-items:center"><span style="font-weight:700">Print a gift card for {{ p.gift_for }}:</span>
-    <a class="btn ghost small" href="{{ url_for('pass_card', code=p.code, style='folded') }}">Folded card</a>
-    <a class="btn ghost small" href="{{ url_for('pass_card', code=p.code, style='flat') }}">Flat card</a></div>{% endif %}
+  {% if p.gift_for %}<div class="row" style="gap:8px;align-items:center"><a class="btn ghost small" href="{{ url_for('pass_card', code=p.code) }}">Print a gift card for {{ p.gift_for }}</a></div>{% endif %}
   {% endfor %}
 </section>
 {% endif %}

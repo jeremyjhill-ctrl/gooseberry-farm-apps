@@ -197,25 +197,27 @@ check("printable certificate", guest.get("/shop/pass/{}/print".format(P)).status
 check("pass link works with the dash", guest.get("/shop/pass/{}-{}".format(P[:4], P[4:])).status_code == 302)
 
 # ---------------------------------------------------------------- gift cards to print (Nov 26, 2026)
+CARD = "/shop/pass/{}/card".format(P)
 h = body(guest.get("/shop/order/" + ocode))
-check("order page offers both gift cards for a gift pass", "Print a gift card for The Miller family" in h
-      and "/shop/pass/{}/card/folded".format(P) in h and "/shop/pass/{}/card/flat".format(P) in h)
-for style in ("folded", "flat"):
-    h = body(guest.get("/shop/pass/{}/card/{}".format(P, style)))
-    check("{} gift card: To and From filled in, real QR and code, what's included".format(style),
-          'data-fill="to" value="The Miller family"' in h and 'data-fill="from" value="Ann Buyer"' in h and "<svg" in h
-          and P[:4] in h and "2 × Playdate" in h and "A gift for you" in h)
-check("gift card has no greeting printed (Jeremy's choice)", "Merry Christmas" not in body(guest.get("/shop/pass/{}/card/folded".format(P))))
+check("order page offers one gift card for a gift pass", "Print a gift card for The Miller family" in h and 'href="{}"'.format(CARD) in h
+      and "/card/folded" not in h and "Folded" not in h)
+h = body(guest.get(CARD))
+check("gift card: To and From filled in, real QR and code, what's included",
+      'data-fill="to" value="The Miller family"' in h and 'data-fill="from" value="Ann Buyer"' in h and "<svg" in h
+      and P[:4] in h and "2 × Playdate" in h and "A gift for you" in h and "cut along the dashed line" in h)
+check("only the flat card now (the folded one was dropped)", "Fold it in half" not in h and "Folded card" not in h and 'class="sheet flat"' in h)
+check("gift card has no greeting printed (Jeremy's choice)", "Merry Christmas" not in h)
+check("old folded and flat card links open the one card", all(loc(guest.get("/shop/pass/{}/card/{}".format(P, st))).endswith(CARD) for st in ("folded", "flat")))
 check("an unknown card style is not found", guest.get("/shop/pass/{}/card/poster".format(P)).status_code == 404)
-check("pass page links the gift cards", "/shop/pass/{}/card/folded".format(P) in body(guest.get("/shop/pass/" + P)))
+check("pass page links the gift card", 'href="{}"'.format(CARD) in body(guest.get("/shop/pass/" + P)))
 mail = " ".join(x["body"] for x in q("SELECT body FROM outbox WHERE recipient='ann@example.com'"))
-check("receipt links a gift card for each gift pass", "Giving it to The Miller family? Print a gift card" in mail and "/shop/pass/{}/card/folded".format(P) in mail)
+check("receipt links the gift card for each gift pass", "Giving it to The Miller family? Print a gift card" in mail and CARD + "\n" in mail + "\n")
 
 
 # Staci's own picture on the front (Nov 26, 2026)
 PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 LAMB = 'viewBox="0 0 220 170"'
-check("cards start with the drawn lamb", body(guest.get("/shop/pass/{}/card/flat".format(P))).count(LAMB) == 1)
+check("cards start with the drawn lamb", body(guest.get(CARD)).count(LAMB) == 1)
 guest.post("/shop/admin/settings/gift-card", data={"photo_data": PNG})
 check("only staff can change the gift card picture", not q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")
       or json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"]) == "")
@@ -223,17 +225,17 @@ check("staff see a sample card; customers don't", "Sample card" in body(c.get("/
       and "Sample card" not in body(guest.get("/shop/admin/gift-card-sample")))
 c.post("/shop/admin/settings/gift-card", data={"photo_data": PNG})
 pic = json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"])
-hf, hl = body(guest.get("/shop/pass/{}/card/folded".format(P))), body(guest.get("/shop/pass/{}/card/flat".format(P)))
-check("Staci's picture replaces the lamb on the front of both cards", pic and 'class="coverphoto" src="/shop/photos/{}"'.format(pic) in hf
-      and 'class="coverphoto"' in hl and hl.count(LAMB) == 0 and hf.count(LAMB) == 1, (pic, hf.count(LAMB), hl.count(LAMB)))
+hl = body(guest.get(CARD))
+check("Staci's picture replaces the lamb on the gift card", pic and 'class="coverphoto" src="/shop/photos/{}"'.format(pic) in hl
+      and hl.count(LAMB) == 0, (pic, hl.count(LAMB)))
 check("the picture is served", guest.get("/shop/photos/" + pic).status_code == 200)
 check("settings page shows the current picture", "/shop/photos/" + pic in body(c.get("/shop/admin/settings")))
 r = c.post("/shop/admin/settings/gift-card", data={"photo_data": ""}, follow_redirects=True)
 check("saving with no photo chosen says so and keeps the picture", "Choose a photo first" in body(r)
       and json.loads(q("SELECT value FROM shop_settings WHERE key='gift_card_photo'")[0]["value"]) == pic)
 c.post("/shop/admin/settings/gift-card", data={"remove": "1"})
-check("going back to the lamb", body(guest.get("/shop/pass/{}/card/flat".format(P))).count(LAMB) == 1
-      and 'class="coverphoto"' not in body(guest.get("/shop/pass/{}/card/flat".format(P))))
+check("going back to the lamb", body(guest.get(CARD)).count(LAMB) == 1
+      and 'class="coverphoto"' not in body(guest.get(CARD)))
 # ---------------------------------------------------------------- two passes, two people, one checkout
 c.post("/shop/admin/products/new?kind=pass", data={"name": "Duo pass", "price": "20", "cq_0": "1", "ct_0": str(PLAY),
                                                    "season_label": "Good in 2027"})

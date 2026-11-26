@@ -4,7 +4,8 @@
 <title>Gift card · {{ p.title }} · Gooseberry Bridge Farm</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet">
 <style>
-/* Printable gift card (Nov 26, 2026). Sized in inches for a US Letter sheet. Nothing typed here is saved. */
+/* Printable gift card (Nov 26, 2026): one card on the top half of a US Letter sheet, cut out along the line.
+   Sized in inches. Nothing typed here is saved. (A folded version was tried and dropped the same day.) */
 @page{size:letter;margin:0}
 *{box-sizing:border-box}
 body{margin:0;font-family:Nunito,sans-serif;color:#1E2A20;background:#F7F5EE}
@@ -13,43 +14,31 @@ body{margin:0;font-family:Nunito,sans-serif;color:#1E2A20;background:#F7F5EE}
 .bar label{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:15px}
 .bar input,.bar textarea{width:100%;min-width:0;font:inherit;font-weight:400;font-size:16px;padding:10px 12px;border:1px solid #C9CEC0;border-radius:10px;background:#fff}
 .bar .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.tabs{display:flex;gap:8px}.tabs a{padding:8px 14px;border-radius:999px;border:2px solid #2F5D3A;color:#2F5D3A;font-weight:800;text-decoration:none}
-.tabs a.on{background:#2F5D3A;color:#fff}
 .btn{font:inherit;font-weight:800;font-size:17px;padding:12px 18px;border-radius:12px;border:2px solid #2F5D3A;background:#2F5D3A;color:#fff;cursor:pointer}
 .tip{font-size:14px;color:#4F5A51;margin:0}
 .stage{overflow:hidden;margin:0 auto 30px}
 .sheet{background:#fff;transform-origin:top left;box-shadow:0 2px 12px rgba(0,0,0,.12)}
-.folded{width:8.5in;height:11in;display:grid;grid-template-columns:4.25in 4.25in;grid-template-rows:5.5in 5.5in;position:relative}
 .flat{width:8.5in;height:5.5in;display:grid;grid-template-columns:3.1in 1fr;border:1px dashed #C9CEC0}
 .panel{padding:.45in .42in;display:flex;flex-direction:column;gap:.14in;overflow:hidden}
-.flip{transform:rotate(180deg)}
 .coverphoto{width:100%;object-fit:cover;border-radius:.12in;display:block}
 .cover{background:#E9F0E2;align-items:center;justify-content:center;text-align:center}
 .cover .big{font-family:Fredoka,sans-serif;font-weight:600;font-size:30pt;line-height:1.05;color:#2F5D3A}
 .cover .sub{font-size:11.5pt;font-weight:700;color:#4F5A51}
-.back{align-items:center;justify-content:center;text-align:center;gap:.08in}
-.back .farm{font-family:Fredoka,sans-serif;font-weight:600;font-size:15pt;color:#2F5D3A}
 .small{font-size:10.5pt;color:#4F5A51;line-height:1.45}
 .line{display:flex;align-items:flex-end;gap:.1in}
 .line b{font-size:11.5pt;color:#2F5D3A;width:.55in;flex:none}
 .line .hand{flex:1;border-bottom:1.5px solid #9AA896;min-height:.36in;font-family:Caveat,cursive;font-size:21pt;line-height:1.05}
-.notehead{font-weight:800;font-size:11.5pt;color:#2F5D3A}
 .note{font-family:Caveat,cursive;font-size:18pt;line-height:.4in;min-height:1.6in;background-image:repeating-linear-gradient(transparent 0 calc(.4in - 1px),#C9D2C4 calc(.4in - 1px) .4in);white-space:pre-line;overflow-wrap:anywhere}
 .label{font-size:9pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#2F5D3A}
 .title{font-family:Fredoka,sans-serif;font-weight:600;font-size:20pt;line-height:1.15;margin:0}
 ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
-.qrrow{display:flex;gap:.14in;align-items:center}
 .qr svg{width:1.2in;height:1.2in;display:block}
 .code{font-family:ui-monospace,Menlo,monospace;font-weight:800;letter-spacing:.08em;font-size:13pt}
-.foldh{position:absolute;left:0;right:0;top:5.5in;border-top:1px dashed #C9CEC0}
-.foldv{position:absolute;top:0;bottom:0;left:4.25in;border-left:1px dashed #C9CEC0}
 @media print{body{background:#fff}.bar{display:none}.stage{margin:0;width:auto!important;height:auto!important}.sheet{transform:none!important;box-shadow:none}}
 </style></head><body>
 <div class="bar">
   <h1>Print a gift card</h1>
   {% if sample %}<div style="background:#FFF4D6;border-radius:10px;padding:8px 12px;font-weight:700">Sample card with made-up details. The QR code here doesn't open anything.</div>{% endif %}
-  <div class="tabs"><a href="{{ url_for('gift_card_sample', style='folded') if sample else url_for('pass_card', code=p.code, style='folded') }}" class="{{ 'on' if style == 'folded' }}">Folded card</a>
-    <a href="{{ url_for('gift_card_sample', style='flat') if sample else url_for('pass_card', code=p.code, style='flat') }}" class="{{ 'on' if style == 'flat' }}">Flat card</a></div>
   <div class="grid">
     <label>To <input type="text" data-fill="to" value="{{ to }}" maxlength="60" placeholder="Leave blank to write it in"></label>
     <label>From <input type="text" data-fill="from" value="{{ frm }}" maxlength="60" placeholder="Leave blank to write it in"></label>
@@ -57,8 +46,7 @@ ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
   <label>A short note <span style="font-weight:600;color:#4F5A51">(optional, or write it by hand)</span>
     <textarea data-fill="note" rows="2" maxlength="140"></textarea></label>
   <button class="btn" type="button" onclick="window.print()">Print</button>
-  {% if style == 'folded' %}<p class="tip">Print on plain letter paper, one side, at actual size (100%). Fold it in half top to bottom with the printing on the outside, then in half again, so the lamb is on the front.</p>
-  {% else %}<p class="tip">Print on plain letter paper at actual size (100%), then cut along the dashed line.</p>{% endif %}
+<p class="tip">Print on plain letter paper at actual size (100%), then cut along the dashed line.</p>
 </div>
 {% macro gift() %}
   <div class="label">Your gift</div>
@@ -66,22 +54,11 @@ ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
   {% if credits %}<ul>{% for c in credits %}<li>{{ c.qty }} × {{ c.name }}</li>{% endfor %}</ul>{% endif %}
   {% if p.season_label or p.valid_until %}<div class="small">{{ p.season_label }}{% if p.season_label and p.valid_until %} · {% endif %}{% if p.valid_until %}good through {{ nice_day(p.valid_until) }}{% endif %}</div>{% endif %}
 {% endmacro %}
-{% macro qrbox() %}<div class="qrrow"><div class="qr">{{ qr|safe }}</div>
-  <div style="display:flex;flex-direction:column;gap:.06in"><b style="font-size:11pt;line-height:1.35">Scan to see your pass and book your visit.</b><span class="code">{{ pretty_code(p.code) }}</span></div></div>{% endmacro %}
 {% macro names() %}
   <div class="line"><b>To:</b><span class="hand" data-show="to"></span></div>
   <div class="line"><b>From:</b><span class="hand" data-show="from"></span></div>
 {% endmacro %}
 <div class="stage" data-stage>
-{% if style == 'folded' %}
-<div class="sheet folded" data-sheet>
-  <div class="panel back flip">{{ lamb('1.1in') }}<div class="farm">Gooseberry Bridge Farm</div><div class="small">Rogersville, Missouri<br>{{ site }}</div></div>
-  <div class="panel cover flip">{% if SS.gift_card_photo %}<img class="coverphoto" src="{{ url_for('photo', name=SS.gift_card_photo) }}" alt="" style="height:3.3in">{% else %}{{ lamb('2.5in') }}{% endif %}<div class="big">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
-  <div class="panel" style="justify-content:center;gap:.2in">{{ names() }}<div><div class="notehead">A note:</div><div class="note" data-show="note"></div></div></div>
-  <div class="panel" style="justify-content:center">{{ gift() }}{{ qrbox() }}<div class="small">Or go to {{ site }} and enter the code when you book.</div></div>
-  <div class="foldh"></div><div class="foldv"></div>
-</div>
-{% else %}
 <div class="sheet flat" data-sheet>
   <div class="panel cover">{% if SS.gift_card_photo %}<img class="coverphoto" src="{{ url_for('photo', name=SS.gift_card_photo) }}" alt="" style="height:3.1in">{% else %}{{ lamb('2.2in') }}{% endif %}<div class="big" style="font-size:26pt">A gift for you</div><div class="sub">Baby animal playdates at<br>Gooseberry Bridge Farm</div></div>
   <div class="panel" style="justify-content:center;gap:.12in">{{ names() }}
@@ -90,7 +67,6 @@ ul{margin:0;padding-left:.22in;font-size:11.5pt;line-height:1.5}
       <div style="display:flex;flex-direction:column;align-items:center;gap:.04in;text-align:center"><div class="qr">{{ qr|safe }}</div><span class="code" style="font-size:11pt">{{ pretty_code(p.code) }}</span><span class="small" style="font-size:9pt;max-width:1.4in">Scan to see your pass and book your visit</span></div></div>
   </div>
 </div>
-{% endif %}
 </div>
 <script>
 (function () {

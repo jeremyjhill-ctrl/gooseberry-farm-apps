@@ -24,8 +24,7 @@
 </section>
 <div class="row noprint" style="justify-content:center">
   <a href="{{ url_for('pass_print', code=p.code) }}">Printable version</a>
-  <a href="{{ url_for('pass_card', code=p.code, style='folded') }}">Gift card (folded)</a>
-  <a href="{{ url_for('pass_card', code=p.code, style='flat') }}">Gift card (flat)</a>
+  <a href="{{ url_for('pass_card', code=p.code) }}">Print a gift card</a>
   <a href="#" onclick="if(navigator.share){navigator.share({title:'{{ p.title|e }}',url:location.href});return false}else{navigator.clipboard&&navigator.clipboard.writeText(location.href);this.textContent='Link copied';return false}">Share this pass</a>
 </div>
 

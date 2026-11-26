@@ -975,7 +975,7 @@ def create_app():
                 lines.append("  {}{}: {}".format(p["title"], who, url_for("pass_page", code=p["code"], _external=True)))
             for p in [x for x in o["passes"] if x["gift_for"]]:
                 lines += ["", "Giving it to {}? Print a gift card to put under the tree:".format(p["gift_for"]),
-                          "  " + url_for("pass_card", code=p["code"], style="folded", _external=True)]
+                          "  " + url_for("pass_card", code=p["code"], _external=True)]
             if playdate_settings().get("booking_hidden"):
                 lines += ["", "Playdate booking opens soon. When it does, pick a time on our booking page and enter your pass code at checkout:",
                           "  " + booking_url()]
@@ -1036,24 +1036,29 @@ def create_app():
         """What a printed gift card looks like with the current picture (made-up pass details)."""
         fake = {"code": "SAMPLE00", "title": "Spring Family Pass", "gift_for": "The Miller family", "holder": "Ann Buyer",
                 "season_label": "Good during the 2027 season", "valid_until": ""}
-        return render_template("gift_card.html", p=fake, style="flat" if request.args.get("style") == "flat" else "folded", sample=True,
+        return render_template("gift_card.html", p=fake, sample=True,
                                credits=[{"qty": 2, "name": "Playdate"}], to="The Miller family", frm="Ann Buyer",
                                site=request.host + request.script_root, qr=qr_svg("https://example.com/sample"))
 
-    @app.get("/pass/<code>/card/<style>")
-    def pass_card(code, style):
-        """A printable gift card for under the tree: folded (one letter sheet, folded in quarters) or flat (half sheet).
+    @app.get("/pass/<code>/card")
+    def pass_card(code):
+        """A printable gift card for under the tree: one card on the top half of a letter sheet, cut out along the line.
         To, From and a short note are typed on the page before printing; nothing typed there is saved."""
-        if style not in ("folded", "flat"):
-            abort(404)
         p = pass_or_404(code)
         if fp.clean_code(code) != code:
-            return redirect(url_for("pass_card", code=p["code"], style=style))
+            return redirect(url_for("pass_card", code=p["code"]))
         credits = [c for c in fp.credits(db(), p["id"]) if c["qty"]]
-        return render_template("gift_card.html", p=p, style=style, credits=credits,
+        return render_template("gift_card.html", p=p, credits=credits,
                                to=p["gift_for"] or p["holder"] or "", frm=p["holder"] if p["gift_for"] else "",
                                site=request.host + request.script_root,
                                qr=qr_svg(url_for("pass_page", code=p["code"], _external=True)))
+
+    @app.get("/pass/<code>/card/<style>")
+    def pass_card_style(code, style):
+        # There used to be a folded card and a flat one (Nov 26, 2026); links to either open the one card now.
+        if style not in ("folded", "flat"):
+            abort(404)
+        return redirect(url_for("pass_card", code=code))
 
     @app.post("/pass/<code>/use")
     @admin_required
