@@ -315,6 +315,62 @@ check("someone guessing at many logins from one address is paused",
 check("...while everyone else signs in normally", via_render(new(), home, "jeremy@example.com", "barn-clover-meadow").status_code == 302)
 farm_auth.LOGIN_TRIES.clear()
 
+# ---------------------------------------------------------------- the Logins page buttons, pressed the way a browser does
+# A browser sends every field of the row's form in page order plus the button pressed. Until Nov 26, 2026 a hidden
+# "save" came first and won, so Delete, Set it, Turn off and Email a link only saved the boxes (Jeremy couldn't remove
+# Staci's duplicate login or reset her password). These checks submit the real page instead of hand-made data.
+from werkzeug.datastructures import MultiDict  # noqa: E402
+
+
+def press(client, email, button, typed=None):
+    typed = typed or {}
+    page = body(client.get("/account/logins"))
+    form = next(f for f in re.findall(r'<form method="post" class="card".*?</form>', page, flags=re.S) if email in f)
+    data = MultiDict()
+    for kind, attrs in re.findall(r"<(input|button)\b([^>]*)>", form):
+        a = dict(re.findall(r'([\w-]+)="([^"]*)"', attrs))
+        bare = set(re.findall(r"\s(checked|disabled)(?=[\s>/])", attrs))
+        name = a.get("name")
+        if not name or "disabled" in bare:
+            continue
+        if kind == "button":
+            if a.get("value") == button:
+                data.add(name, a["value"])
+        elif a.get("type") == "checkbox":
+            if typed.get(name, "checked" in bare):
+                data.add(name, a.get("value", "on"))
+        else:
+            data.add(name, typed.get(name, a.get("value", "")))
+    return client.post("/account/logins", data=data)
+
+
+boss = new()
+login(boss, "jeremy@example.com", "barn-clover-meadow")
+boss.post("/account/logins", data={"action": "add", "name": "Staci", "email": "staci.oops@example.com", "password": "first-mixup-pw-1",
+                                   "can_playdates": "1", "can_shop": "1"})
+dup = q("SELECT id FROM farm_users WHERE email='staci.oops@example.com'")
+r = press(boss, "staci.oops@example.com", "delete")
+check("(browser) Delete without the confirm tick asks for it", "Tick the box" in body(r) and q("SELECT id FROM farm_users WHERE email='staci.oops@example.com'"))
+r = press(boss, "staci.oops@example.com", "delete", {"confirm_delete": True})
+check("(browser) Delete really removes a duplicate login", dup and not q("SELECT id FROM farm_users WHERE email='staci.oops@example.com'"), body(r)[-300:])
+press(boss, "staci@example.com", "temp", {"temp": "fresh-start-pw-9"})
+r = login(new(), "staci@example.com", "fresh-start-pw-9")
+check("(browser) Set a temporary password really sets it", r.status_code == 302 and "account/password" in loc(r), loc(r))
+press(boss, "staci@example.com", "save", {"temp": "return-key-pw-7"})
+check("(browser) typing a temporary password and pressing Return sets it too",
+      login(new(), "staci@example.com", "return-key-pw-7").status_code == 302)
+press(boss, "staci@example.com", "off")
+check("(browser) Turn off really turns someone off", not q("SELECT active FROM farm_users WHERE email='staci@example.com'")[0]["active"])
+press(boss, "staci@example.com", "on")
+check("(browser) Turn back on works", q("SELECT active FROM farm_users WHERE email='staci@example.com'")[0]["active"])
+SENT.clear()
+press(boss, "staci@example.com", "reset")
+check("(browser) Email a password link really emails it", len(SENT) == 1 and SENT[0]["to"] == "staci@example.com", SENT)
+before = q("SELECT can_bakery FROM farm_users WHERE email='staci@example.com'")[0]["can_bakery"]
+press(boss, "staci@example.com", "save", {"can_bakery": not before})
+check("(browser) Save access still saves the boxes", q("SELECT can_bakery FROM farm_users WHERE email='staci@example.com'")[0]["can_bakery"] == (0 if before else 1))
+farm_auth.LOGIN_TRIES.clear()
+
 # ---------------------------------------------------------------- the booking page and customer pages are untouched
 check("customers still book without logging in", new().get("/book").status_code == 200)
 check("shop customer page untouched", new().get("/shop/").status_code in (200, 503))

@@ -425,13 +425,13 @@ LOGINS = """<div class="row between"><h1>Logins</h1><a class="btn ghost small" h
   <h2>People</h2>
   {% for u in people %}
   <form method="post" class="card" style="padding:12px;gap:8px;{{ 'opacity:.6' if not u.active }}">
-    <input type="hidden" name="action" value="save"><input type="hidden" name="id" value="{{ u.id }}">
+    <input type="hidden" name="id" value="{{ u.id }}">
     <div class="row between"><span><b>{{ u.name }}</b> <span class="muted">{{ u.email }}</span>{% if u.id == me.id %} <span class="tag">you</span>{% endif %}{% if not u.active %} <span class="tag grey">turned off</span>{% endif %}</span>
       <span class="muted">{{ 'Last logged in ' ~ u.last_login_at[:10] if u.last_login_at else 'Never logged in' }}</span></div>
     <div class="row">{% for key, label in apps %}<label class="inline"><input type="checkbox" name="can_{{ key }}" value="1" {{ 'checked' if u['can_' ~ key] }} {{ 'disabled' if key == 'logins' and u.id == me.id }}> <span>{{ label }}</span></label>{% endfor %}
       {% if u.id == me.id %}<input type="hidden" name="can_logins" value="1">{% endif %}</div>
     <div class="row">
-      <button class="btn small">Save access</button>
+      <button class="btn small" name="action" value="save">Save access</button>
       {% if u.id != me.id %}
         <button class="btn ghost small" name="action" value="{{ 'off' if u.active else 'on' }}">{{ 'Turn off' if u.active else 'Turn back on' }}</button>
         <button class="btn ghost small" name="action" value="reset">Email a password link</button>
@@ -592,7 +592,11 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
         msgs = []
         if request.method == "POST":
             f = request.form
-            act = f.get("action")
+            # Each person's row is one form; the button pressed says what to do. (Until Nov 26, 2026 a hidden "save" came
+            # first and won, so Delete, Set it, Turn off and Email a link only ever saved the boxes.)
+            act = f.get("action") or "save"
+            if act == "save" and f.get("temp", "").strip():
+                act = "temp"  # typed a temporary password and pressed Return
             if act == "add":
                 name, email, pw = f.get("name", "").strip(), f.get("email", "").strip().lower(), f.get("password", "")
                 err = ("Please enter a name and email." if not name or "@" not in email else "") or password_problem(pw) \
