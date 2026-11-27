@@ -300,6 +300,19 @@ check("edit form shows both boxes ticked", body(r).count("checked>") >= 2 and 'n
       and 'name="can_pickup" value="1" checked' in body(r))
 check("products list says ships or pick up", "Ships or pick up" in body(c.get("/shop/admin/products")))
 check("product page offers both", "pick it up at the farm for free" in body(guest.get("/shop/p/{}".format(signed["id"]))))
+
+
+def card_of(page, pid):
+    """The product's card on a shop page (from its link to the end of the card)."""
+    start = page.find('href="/shop/p/{}"'.format(pid))
+    return page[start:page.find("</a>", start)] if start >= 0 else ""
+
+
+home = body(c.get("/shop/"))
+check("card tags an item that ships or picks up", "Shipping available" in card_of(home, signed["id"]) and "Farm pickup" in card_of(home, signed["id"]),
+      card_of(home, signed["id"])[-400:])
+check("card tags a pass as neither", "Shipping available" not in card_of(home, bundle["id"]) and "Farm pickup" not in card_of(home, bundle["id"])
+      and "Electronic delivery" in card_of(home, bundle["id"]))
 g3 = Client(wsgi.application)
 g3.post("/shop/cart/add", data={"product_id": signed["id"], "qty": 1})
 check("cart explains the choice", "or free if you pick it up" in body(g3.get("/shop/cart")))
@@ -328,6 +341,8 @@ c.post("/shop/admin/products/new?kind=item", data={"name": "Inscribed book", "pr
        "q_label_0": "How would you like it inscribed?", "q_long_0": "1", "q_req_0": "1",
        "q_label_1": "Anything else we should know?", "q_long_1": "0", "q_label_2": ""}, content_type="multipart/form-data")
 ib = q("SELECT * FROM shop_products WHERE name='Inscribed book'")[0]
+ibcard = card_of(body(c.get("/shop/")), ib["id"])
+check("card tags a pickup-only item as farm pickup only", "Farm pickup" in ibcard and "Shipping available" not in ibcard, ibcard[-300:])
 qs = json.loads(ib["custom_fields"])
 check("questions save", [x["label"] for x in qs] == ["How would you like it inscribed?", "Anything else we should know?"]
       and qs[0]["long"] and qs[0]["required"] and not qs[1]["long"] and not qs[1]["required"], qs)
@@ -407,6 +422,8 @@ r = c.post("/shop/admin/products/new?kind=item", data={"name": "Big photo book",
 big = q("SELECT * FROM shop_products WHERE name='Big photo book'")
 check("product with a full-size photo saves", r.status_code == 302 and big and big[0]["photo"], (r.status_code, body(r)[:200]))
 bid = big[0]["id"] if big else 0
+bigcard = card_of(body(c.get("/shop/")), bid)
+check("card tags a ship-only item as shipping only", "Shipping available" in bigcard and "Farm pickup" not in bigcard, bigcard[-300:])
 r = c.post("/shop/admin/products/{}".format(bid), data={"name": "Big photo book", "price": "30", "can_ship": "1",
            "photo_fit": "whole", "photo_x": "20", "photo_y": "80", "photo_zoom": "2"}, content_type="multipart/form-data")
 pv = json.loads(q("SELECT photo_view FROM shop_products WHERE id=?", bid)[0]["photo_view"] or "{}")

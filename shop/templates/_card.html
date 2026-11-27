@@ -17,6 +17,8 @@
       {% elif p.left is not none and p.left <= 10 %}<span class="tag amber">Only {{ p.left }} left</span>{% endif %}
       {% if p.kind == 'pass' and p.season_label %}<span class="tag">{{ p.season_label }}</span>{% endif %}
       {% if p.kind == 'pass' or p.fulfillment == 'none' %}<span class="tag">Electronic delivery</span>{% endif %}
+      {% if p.fulfillment in ('ship', 'both') %}<span class="tag">Shipping available</span>{% endif %}
+      {% if p.fulfillment in ('pickup', 'both') %}<span class="tag">Farm pickup</span>{% endif %}
     </div>
   </div>
 </a>
