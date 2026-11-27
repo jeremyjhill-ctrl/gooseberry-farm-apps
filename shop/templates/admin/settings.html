@@ -130,10 +130,16 @@
   <label class="inline"><input type="checkbox" name="shop_emails" value="1" {{ 'checked' if SS.shop_emails }}>
     <span><b>Send shop emails for real</b>: order receipts with pass links. Off, they only show on the <a href="{{ url_for('admin_emails') }}">Emails</a> page.
     Playdate emails have their own switch.</span></label>
+  <label class="inline"><input type="checkbox" name="order_alerts" value="1" {{ 'checked' if SS.order_alerts }}>
+    <span><b>Email us about each new order</b>: who bought what, the total, and whether it ships, is picked up or is a pass,
+    with a link to the order. Sent along with the shop emails, so only while those are on.</span></label>
+  <label style="max-width:340px">Send them to <input type="email" name="order_alert_to" value="{{ SS.order_alert_to }}" placeholder="{{ farm_email or 'hello@gooseberrybridge.com' }}"></label>
+  <div class="muted">Leave it blank for the farm's own address{% if farm_email %} ({{ farm_email }}){% endif %}.</div>
   <label style="max-width:340px">Most farm emails per day <input type="number" name="email_daily_limit" min="0" max="100" value="{{ SS.email_daily_limit }}"></label>
   <div class="muted">Sent today: <b>{{ emails_sent_today() }}</b> (days run midnight to midnight UTC, like Resend's).
     Resend's free plan allows 100 a day, shared with Pasture Keeper, so this keeps room for its password resets.
-    Past the limit, emails wait and go out after the evening reset. Customers still see their passes on the order page straight away.</div>
+    Past the limit, emails wait and go out after the evening reset. Customers still see their passes on the order page straight away.
+    New-order emails to the farm stop {{ ORDER_ALERT_SPARE }} short of the limit, so customers' receipts always come first.</div>
   <button class="btn">Save email settings</button>
 </form>
 {% endblock %}

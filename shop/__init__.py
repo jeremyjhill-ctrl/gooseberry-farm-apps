@@ -82,10 +82,13 @@ DEFAULT_SETTINGS = {
     "gift_card_photo": "",     # Staci's photo for the front of printable gift cards ("" = the drawn lamb)
     "shop_emails": False,      # send shop emails (receipts with pass links) for real; off = they only show in Messages
     "email_daily_limit": farm_mail.DEFAULT_DAILY_LIMIT,  # leaves room in Resend's free 100 a day for Pasture Keeper
+    "order_alerts": True,      # email the farm about each new order (with the shop emails, so only while those are on)
+    "order_alert_to": "",      # where those go ("" = the farm's own address, hello@)
     "ship_from": {"name": "Gooseberry Bridge Farm", "street1": "", "street2": "", "city": "Rogersville", "state": "MO",
                   "zip": "", "phone": "", "email": ""},  # the return address on shipping labels (email: Shippo requires one)
     "label_size": "PDF_4x6",   # PDF_4x6 for a 4x6 label printer, PDF for plain 8.5x11 paper
 }
+ORDER_ALERT_SPARE = 10   # a new-order email never uses the day's last 10 emails: customers' receipts come first
 LABEL_SIZES = {"PDF_4x6": "4×6 label printer", "PDF": "Plain paper (8.5×11)"}
 
 
@@ -408,13 +411,14 @@ def create_app():
     def housekeeping():
         db().execute("UPDATE shop_orders SET status='expired' WHERE status='pending' AND hold_expires < ?", (now().isoformat(),))
 
-    def send_email(to, subject, body):
-        """Same as playdate messages: a copy in Playdate admin > Messages, real email when PLAYDATE_EMAILS=on."""
+    def send_email(to, subject, body, spare=0):
+        """A copy on the shop's Emails page, and a real email while Settings > Email > Send shop emails for real is on.
+        spare: see farm_mail.deliver (the farm's own notices give way to customers' emails)."""
         if not to:
             return
         cur = db().execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (NULL, 'email', ?, ?, ?, ?)",
                            (to, subject, body, now().isoformat()))
-        farm_mail.deliver(db(), cur.lastrowid, "shop")  # records sent / waiting / not sent on the message
+        farm_mail.deliver(db(), cur.lastrowid, "shop", spare=spare)  # records sent / waiting / not sent on the message
 
     def save_photo(data_url):
         m = re.match(r"^data:image/(jpeg|png|webp);base64,(.+)$", data_url or "", re.S)
@@ -760,7 +764,12 @@ def create_app():
         except Exception:
             con.execute("ROLLBACK")
             raise
-        email_order(order_by_code(fresh["code"]))
+        o = order_by_code(fresh["code"])
+        email_order(o)
+        try:
+            email_new_order(o)
+        except Exception:  # noqa: BLE001  a notice to the farm must never get in the way of an order
+            app.logger.exception("New-order email failed for order %s", o["code"])
         return True
 
     def settle_with_stripe(o):
@@ -983,6 +992,49 @@ def create_app():
             lines += ["", s["pickup_note"]]
         lines += ["", "Order {} · {}".format(fp.pretty_code(o["code"]), url_for("order", code=o["code"], _external=True))]
         send_email(o["email"], "Your {} order".format(s["shop_name"]), "\n".join(lines))
+
+    def order_alert_to():
+        s = settings()
+        return (s.get("order_alert_to") or "").strip() or farm_email()
+
+    def email_new_order(o):
+        """The farm's own heads-up about a paid order (Nov 26, 2026): who, what, how much, and how it goes out."""
+        s = settings()
+        if not s.get("order_alerts"):
+            return
+        first = o["lines"][0]["name"] if o["lines"] else "an order"
+        more = len(o["lines"]) - 1
+        subject = "New order {} · {} · {}{}".format(money(o["total"]), o["name"], first, " + {} more".format(more) if more > 0 else "")
+        how_paid = {"stripe": "by card through Stripe", "test_card": "with the TEST card (no real money)",
+                    "free": "nothing (it was free)"}.get(o["method"], o["method"] or "")
+        lines = ["New order {}, paid {}.".format(fp.pretty_code(o["code"]), how_paid), ""]
+        lines += ["Customer: {}".format(o["name"]), "Email: {}".format(o["email"])]
+        if o.get("phone"):
+            lines.append("Phone: {}".format(o["phone"]))
+        lines += ["", "What they bought:"]
+        for l in o["lines"]:
+            how = {"ship": "ships", "pickup": "farm pickup", "pass": "emailed pass"}.get(l["fulfillment"], "")
+            lines.append("  {} × {}  {}{}".format(l["qty"], l["name"], money(l["unit_price"] * l["qty"]), "  ({})".format(how) if how else ""))
+            for a in answers_of(l):
+                lines.append("      {}: {}".format(a["q"], a["a"]))
+            if l["kind"] == "pass":
+                for g in json.loads(l["gift_for"] or "[]"):
+                    lines.append("      " + ("A gift for {}".format(g) if g else "For the buyer"))
+        lines.append("")
+        if float(o["shipping"] or 0):
+            lines.append("Shipping: {}".format(money(o["shipping"])))
+        if float(o["tax"] or 0):
+            lines.append("Sales tax: {}".format(money(o["tax"])))
+        lines.append("Total: {}".format(money(o["total"])))
+        if any(l["fulfillment"] == "ship" for l in o["lines"]):
+            addr = ", ".join(x for x in (o["ship_name"] or o["name"], o["ship_line1"], o["ship_line2"], o["ship_city"]) if x)
+            lines += ["", "Ship to: {} {} {}".format(addr, o["ship_state"] or "", o["ship_zip"] or "").strip()]
+        if any(l["fulfillment"] == "pickup" for l in o["lines"]):
+            lines += ["", "Picking up at the farm: let them know when it's ready."]
+        if o.get("pay_note"):
+            lines += ["", "Check: " + o["pay_note"]]
+        lines += ["", "The order: " + url_for("admin_order", code=o["code"], _external=True)]
+        send_email(order_alert_to(), subject, "\n".join(lines), spare=ORDER_ALERT_SPARE)
 
     @app.get("/order/<code>")
     def order(code):
@@ -1883,7 +1935,8 @@ def create_app():
                                stripe_mode=stripe_mode, stripe_webhook_set=bool(webhook_secret), stripe_events=STRIPE_EVENTS,
                                webhook_url=url_for("stripe_webhook", _external=True),
                                label_mode=farm_shippo.mode(), label_sizes=LABEL_SIZES, profiles=ship_profiles(),
-                               templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES, farm_email=farm_email())
+                               templates=farm_shippo.TEMPLATES, services=farm_shippo.SERVICES, farm_email=farm_email(),
+                               ORDER_ALERT_SPARE=ORDER_ALERT_SPARE)
 
     @app.post("/admin/settings/gift-card")
     @admin_required
@@ -1907,6 +1960,12 @@ def create_app():
     def admin_settings_email():
         f = request.form
         save_setting("shop_emails", f.get("shop_emails") == "1")
+        alert_to = f.get("order_alert_to", "").strip()
+        if alert_to and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", alert_to):
+            flash("That new-order email address doesn't look right.")
+            return redirect(url_for("admin_settings") + "#email")
+        save_setting("order_alerts", f.get("order_alerts") == "1")
+        save_setting("order_alert_to", alert_to)
         try:
             save_setting("email_daily_limit", max(0, min(100, int(f.get("email_daily_limit", "").strip() or farm_mail.DEFAULT_DAILY_LIMIT))))
         except ValueError:

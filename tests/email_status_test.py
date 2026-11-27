@@ -170,6 +170,38 @@ staff.post("/shop/admin/emails/{}/send-again".format(bad))
 check("shop Send again works", q("SELECT email_status FROM outbox WHERE id=?", bad)[0]["email_status"] == "sent"
       and "waiting or not sent" not in body(staff.get("/shop/admin")))
 
+# ---------------------------------------------------------------- the farm's own notices give way to customers (Nov 26, 2026)
+def shop_row(to):
+    c = con()
+    c.execute("INSERT INTO outbox(booking_id, channel, recipient, subject, body, created_at) VALUES (NULL, 'email', ?, 'Hi', 'Hi', ?)",
+              (to, dt.datetime.now().isoformat()))
+    i = c.execute("SELECT MAX(id) FROM outbox").fetchone()[0]
+    return c, i
+
+
+c = con()
+today = farm_mail.sent_today(c)
+c.close()
+staff.post("/shop/admin/settings/email", data={"shop_emails": "1", "email_daily_limit": str(today + 12)})
+c, i = shop_row("farm-a@example.com")
+check("a farm notice goes out while there's room to spare", farm_mail.deliver(c, i, "shop", spare=10) == "sent")
+c.close()
+c, i = shop_row("buyer-b@example.com")
+check("...and a customer's email", farm_mail.deliver(c, i, "shop") == "sent")
+c.close()
+c, i = shop_row("farm-c@example.com")
+got = farm_mail.deliver(c, i, "shop", spare=10)
+r = dict(c.execute("SELECT * FROM outbox WHERE id=?", (i,)).fetchone())
+c.close()
+check("within the last 10, a farm notice isn't sent (and says why)", got == "off" and "kept for customers" in r["email_note"]
+      and "farm-c@example.com" not in [s["to"] for s in M.sent], r)
+c, i = shop_row("buyer-d@example.com")
+check("...while customers' emails still go", farm_mail.deliver(c, i, "shop") == "sent")
+c.close()
+check("a skipped notice isn't held for the evening", farm_mail.retry_due(con()) == 0 or
+      q("SELECT email_status FROM outbox WHERE recipient='farm-c@example.com'")[0]["email_status"] == "off")
+staff.post("/shop/admin/settings/email", data={"shop_emails": "1", "email_daily_limit": "40"})
+
 # ---------------------------------------------------------------- how Resend's real refusals are sorted
 import mailer  # noqa: E402
 check("Resend's daily limit (429 daily_quota_exceeded) means wait", mailer.classify_refusal(429, '{"name":"daily_quota_exceeded"}')[0] == "limit")

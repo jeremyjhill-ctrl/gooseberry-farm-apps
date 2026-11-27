@@ -144,11 +144,12 @@ def _set(con, oid, **cols):
             pass
 
 
-def deliver(con, outbox_id, kind, by_hand=False):
+def deliver(con, outbox_id, kind, by_hand=False, spare=0):
     """Send one Messages row as an email (if that part of the farm sends real email) and record what happened.
 
     Never raises. Returns the new status. by_hand: a person pressed Send again (skips the farm's own daily
-    limit, but not Resend's).
+    limit, but not Resend's). spare: for the farm's own notices (a new order), leave the day's last `spare`
+    emails for customers; past that the notice isn't sent at all (not held: by the evening it's old news).
     """
     try:
         row = con.execute("SELECT * FROM outbox WHERE id=?", (outbox_id,)).fetchone()
@@ -167,6 +168,10 @@ def deliver(con, outbox_id, kind, by_hand=False):
             _set(con, outbox_id, email_status="failed", email_kind=kind, email_note=why)
             return "failed"
         now = utcnow()
+        if spare and not by_hand and sent_today(con, now) >= daily_limit(con) - spare:
+            _set(con, outbox_id, email_status="off", email_kind=kind,
+                 email_note="Not sent: today's last {} emails are kept for customers. The order is on the Orders page.".format(spare))
+            return "off"
         if not by_hand and sent_today(con, now) >= daily_limit(con):
             _set(con, outbox_id, email_status="waiting", email_kind=kind, email_next_try=iso(next_reset(now)),
                  email_note="Held: the farm's daily email limit ({}) was reached. It goes out after the evening reset.".format(daily_limit(con)))

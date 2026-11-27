@@ -765,6 +765,68 @@ check("Mollie's address doesn't get the farm icon", r.data != icon_files["favico
 r = bk.get("/account/login", base_url="https://bakery.example.test")
 check("Mollie's sign-in page doesn't link the farm icon", r.status_code == 200 and "Mollie" in body(r) and ICON_LINK not in body(r), r.status_code)
 
+# ---------------------------------------------------------------- the farm hears about each new order (Nov 26, 2026)
+def money_(x):
+    x = float(x or 0)
+    return "${:,.2f}".format(x) if round(x, 2) != int(round(x, 2)) else "${:,.0f}".format(x)
+
+
+h = body(c.get("/shop/admin/settings"))
+check("Settings offers new-order emails, on by default", 'name="order_alerts" value="1" checked' in h and 'name="order_alert_to"' in h)
+r = c.post("/shop/admin/settings/email", data={"order_alerts": "1", "order_alert_to": "not an address", "email_daily_limit": "40"})
+check("a mistyped address is refused", "look right" in body(c.get("/shop/admin/settings")))
+c.post("/shop/admin/settings/email", data={"order_alerts": "1", "order_alert_to": "farm@example.com", "email_daily_limit": "40"})
+nb = Client(wsgi.application)
+nb.post("/shop/cart/add", data={"product_id": signed["id"], "qty": 1})
+add_pass(nb, DUO)
+add_pass(nb, DUO)
+r = nb.post("/shop/checkout", data={"name": "Nell Notice", "email": "nell@example.com", "phone": "417-555-0101", "agree": "on", "how": "ship",
+                                    **owners(nb, ["Grandma Jo"]),
+                                    "ship_line1": "3 Oak Ln", "ship_city": "Ozark", "ship_state": "MO", "ship_zip": "65721"})
+ncode = loc(r).rstrip("/").split("/")[-1]
+check("no notice before the order is paid", not q("SELECT id FROM outbox WHERE recipient='farm@example.com'"))
+nb.post("/shop/pay/" + ncode, data={"card": "4242 4242 4242 4242"})
+nb.get("/shop/order/" + ncode)  # coming back to the order page doesn't send a second one
+note_rows = q("SELECT * FROM outbox WHERE recipient='farm@example.com'")
+check("one new-order email to the farm", len(note_rows) == 1, note_rows)
+nm = note_rows[0] if note_rows else {"subject": "", "body": ""}
+no = q("SELECT * FROM shop_orders WHERE code=?", ncode)[0]
+check("its subject says how much, who and what", nm["subject"].startswith("New order " + money_(no["total"]) + " · Nell Notice · ")
+      and "+ 2 more" in nm["subject"], nm["subject"])
+for label, bit in (("customer's email", "nell@example.com"), ("phone", "417-555-0101"), ("the book, shipping", "× Signed copy"),
+                   ("the passes", "× Duo pass"), ("who each pass is for", "A gift for Grandma Jo"), ("...and the buyer's own", "For the buyer"),
+                   ("the total", "Total: " + money_(no["total"])), ("the address", "3 Oak Ln, Ozark MO 65721"),
+                   ("that it's the test card", "TEST card"), ("a link to the order", "/shop/admin/orders/" + ncode)):
+    check("the new-order email has " + label, bit in nm["body"], nm["body"])
+check("...and how each line goes out", "(ships)" in nm["body"] and "(emailed pass)" in nm["body"])
+check("it follows the shop's email switch", nm["email_status"] == "off")
+c.post("/shop/admin/settings/email", data={"shop_emails": "1", "order_alerts": "1", "order_alert_to": "farm@example.com", "email_daily_limit": "8"})
+nb4 = Client(wsgi.application)
+add_pass(nb4, DUO)
+r = nb4.post("/shop/checkout", data={"name": "Ora Busy", "email": "ora@example.com", "agree": "on", **owners(nb4)})
+nb4.post("/shop/pay/" + loc(r).rstrip("/").split("/")[-1], data={"card": "4242 4242 4242 4242"})
+farm_note = q("SELECT * FROM outbox WHERE recipient='farm@example.com' ORDER BY id DESC")[0]
+receipt = q("SELECT * FROM outbox WHERE recipient='ora@example.com'")[0]
+check("near the day's limit, the farm's notice steps aside for the customer's receipt",
+      farm_note["email_status"] == "off" and "kept for customers" in farm_note["email_note"] and receipt["email_status"] not in ("off", "waiting"),
+      (farm_note["email_status"], farm_note["email_note"], receipt["email_status"]))
+c.post("/shop/admin/settings/email", data={"order_alert_to": "farm@example.com", "email_daily_limit": "40"})
+nb2 = Client(wsgi.application)
+add_pass(nb2, DUO)
+r = nb2.post("/shop/checkout", data={"name": "Ned Quiet", "email": "ned@example.com", "agree": "on", **owners(nb2)})
+nb2.post("/shop/pay/" + loc(r).rstrip("/").split("/")[-1], data={"card": "4242 4242 4242 4242"})
+check("switched off, no new-order email", len(q("SELECT id FROM outbox WHERE recipient='farm@example.com'")) == 2
+      and q("SELECT id FROM outbox WHERE recipient='ned@example.com'"))
+c.post("/shop/admin/settings/email", data={"order_alerts": "1", "email_daily_limit": "40"})
+before = len(q("SELECT id FROM outbox"))
+nb3 = Client(wsgi.application)
+add_pass(nb3, DUO)
+r = nb3.post("/shop/checkout", data={"name": "Nan Blank", "email": "nan@example.com", "agree": "on", **owners(nb3)})
+n3 = loc(r).rstrip("/").split("/")[-1]
+nb3.post("/shop/pay/" + n3, data={"card": "4242 4242 4242 4242"})
+check("with no farm address set up anywhere, the order still goes through (just the receipt)",
+      q("SELECT status FROM shop_orders WHERE code=?", n3)[0]["status"] == "paid" and len(q("SELECT id FROM outbox")) == before + 1)
+
 summary = {"database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite", "passed": len(results) - len(failures),
            "total": len(results), "failures": failures}
 print(json.dumps(summary, indent=1))
