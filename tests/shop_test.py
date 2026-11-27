@@ -13,6 +13,7 @@ import re
 import sqlite3
 import sys
 import tempfile
+from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -826,6 +827,73 @@ n3 = loc(r).rstrip("/").split("/")[-1]
 nb3.post("/shop/pay/" + n3, data={"card": "4242 4242 4242 4242"})
 check("with no farm address set up anywhere, the order still goes through (just the receipt)",
       q("SELECT status FROM shop_orders WHERE code=?", n3)[0]["status"] == "paid" and len(q("SELECT id FROM outbox")) == before + 1)
+
+# ---------------------------------------------------------------- our own visitor counter (Nov 27, 2026)
+def qw(sql, *args):
+    con_ = dbcompat.connect(os.environ["PLAYDATE_DB"])
+    con_.execute(sql, args)
+    con_.commit()
+    con_.close()
+
+
+qw("DELETE FROM shop_visits")
+SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+def as_(ip, ua=SAFARI, **extra):
+    return {"headers": dict({"User-Agent": ua, "X-Forwarded-For": ip}, **extra)}
+
+
+va, vb = Client(wsgi.application), Client(wsgi.application)
+va.get("/shop/", **as_("203.0.113.7"))
+va.get("/shop/p/{}".format(signed["id"]), **as_("203.0.113.7"))
+va.get("/shop/p/{}".format(signed["id"]), **as_("203.0.113.7"))
+va.post("/shop/cart/add", data={"product_id": signed["id"], "qty": 1}, **as_("203.0.113.7"))
+va.get("/shop/checkout", **as_("203.0.113.7"))
+vb.get("/shop/", **as_("198.51.100.9"))
+vb.get("/shop/p/{}".format(DUO), **as_("198.51.100.9"))
+vb.get("/shop/p/999999", **as_("198.51.100.9"))                       # a missing page
+vb.get("/shop/static/shop.css", **as_("198.51.100.9"))                # files aren't pages
+vb.get("/shop/", **as_("198.51.100.9", **{"Sec-Purpose": "prefetch"}))  # Safari/Chrome guessing ahead
+Client(wsgi.application).get("/shop/", **as_("66.249.66.1", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"))
+Client(wsgi.application).get("/shop/", **as_("31.13.1.1", "facebookexternalhit/1.1"))
+c.get("/shop/", **as_("10.9.9.9"))                                       # the farm, logged in
+vis = q("SELECT * FROM shop_visits")
+check("visits recorded for two customers only", len({v["visitor"] for v in vis}) == 2, vis)
+check("no IP address or browser name kept", not any("203.0.113" in json.dumps(v) or "198.51" in json.dumps(v) or "Safari" in json.dumps(v) for v in vis)
+      and all(re.fullmatch(r"[0-9a-f]{16}", v["visitor"]) for v in vis))
+check("page views: 4 + 2 (not the missing page, a file, a prefetch, robots or staff)", len([v for v in vis if v["kind"] == "view"]) == 6,
+      [(v["kind"], v["product_id"]) for v in vis])
+check("added to cart and started checkout recorded", [v["product_id"] for v in vis if v["kind"] == "cart"] == [signed["id"]]
+      and len([v for v in vis if v["kind"] == "checkout"]) == 1)
+today_s = dt.datetime.now(ZoneInfo("America/Chicago")).date().isoformat()
+orders_before = len(q("SELECT id FROM shop_orders WHERE status='paid' AND test=0 AND SUBSTR(paid_at, 1, 10)=?", today_s))
+paid_real = q("SELECT id FROM shop_orders WHERE status='paid' AND test=1 ORDER BY id DESC")[0]["id"]
+qw("UPDATE shop_orders SET test=0, paid_at=? WHERE id=?", dt.datetime.now(ZoneInfo("America/Chicago")).replace(microsecond=0).isoformat(), paid_real)
+h = body(c.get("/shop/admin"))
+panel = h[h.find('id="visitors"'):h.find("Credits still owed")]
+nums = lambda label: re.findall(r"<td class=\"num\">(?:<b>)?([\d,]+)", panel[panel.find(label):panel.find("</tr>", panel.find(label))])
+check("home shows today's visitors", nums("<b>Visitors</b>")[:1] == ["2"], panel[:900])
+check("...page views, carts, checkouts", nums("Page views")[:1] == ["6"] and nums("Added to cart")[:1] == ["1"] and nums("Started checkout")[:1] == ["1"])
+check("...and today's real (not test) orders", nums("Ordered")[:1] == [str(orders_before + 1)], (orders_before, nums("Ordered")))
+check("...who's on right now", "On the shop right now: 2" in panel)
+check("...and the most viewed product", "Most viewed today:</b>" in panel and "Signed copy (2)" in panel, panel[-900:])
+check("the farm's own visit to the admin isn't counted", len(q("SELECT * FROM shop_visits")) == len(vis))
+yday = (dt.datetime.now(ZoneInfo("America/Chicago")).date() - dt.timedelta(days=1)).isoformat()
+qw("UPDATE shop_visits SET day=?, at=?", yday, yday + "T12:00:00-06:00")
+r = va.get("/shop/", **as_("203.0.113.7"))
+vis2 = q("SELECT * FROM shop_visits WHERE day<>?", yday)
+check("the same phone later the same day is the same visitor", len(vis2) == 1 and vis2[0]["visitor"] in {v["visitor"] for v in vis}, vis2)
+with wsgi.shop.test_request_context("/", headers={"User-Agent": SAFARI}, environ_base={"REMOTE_ADDR": "203.0.113.7"}):
+    vid = wsgi.shop.extensions["visitor_id"]
+    check("...but the next day it's a new scramble (nobody can be followed day to day)", vid("2026-11-27") != vid("2026-11-28")
+          and vid("2026-11-27") == vid("2026-11-27"))
+h = body(c.get("/shop/admin"))
+panel = h[h.find('id="visitors"'):h.find("Credits still owed")]
+check("yesterday and the 7 days add up", nums("<b>Visitors</b>") == ["1", "2", "3"] and nums("Page views") == ["1", "6", "7"], (nums("<b>Visitors</b>"), nums("Page views")))
+check("right now only counts the last 5 minutes", "On the shop right now: 1" in panel)
+ten_ago = (dt.datetime.now(ZoneInfo("America/Chicago")) - dt.timedelta(minutes=10)).replace(microsecond=0)
+qw("UPDATE shop_visits SET at=? WHERE day=?", ten_ago.isoformat(), ten_ago.date().isoformat())
+check("...so someone gone 10 minutes isn't 'right now'", "On the shop right now: 0" in body(c.get("/shop/admin"))
+      or ten_ago.date() != dt.datetime.now(ZoneInfo("America/Chicago")).date())  # (just after midnight there's nothing to test)
 
 summary = {"database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite", "passed": len(results) - len(failures),
            "total": len(results), "failures": failures}

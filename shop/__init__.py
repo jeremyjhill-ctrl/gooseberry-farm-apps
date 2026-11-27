@@ -1212,7 +1212,7 @@ def create_app():
     def admin_home():
         pd = playdate_settings()
         paid = rows("SELECT * FROM shop_orders WHERE status='paid' AND test=0 ORDER BY id DESC")
-        return render_template("admin/home.html", pd=pd, recent=paid[:8], orders_count=len(paid),
+        return render_template("admin/home.html", pd=pd, recent=paid[:8], orders_count=len(paid), visits=visit_stats(),
                                revenue=round(sum(o["subtotal"] for o in paid), 2),
                                passes_sold=row("SELECT COUNT(*) AS n FROM shop_passes WHERE source='sale' AND COALESCE(order_id, 0) NOT IN "
                                                "(SELECT id FROM shop_orders WHERE test=1)")["n"],
@@ -1994,6 +1994,79 @@ def create_app():
         flash({"sent": "Sent.", "waiting": "Not sent yet: it's waiting and will go out by itself (see the note on it).",
                "console": "No email service is connected here, so it only shows on this page."}.get(result, "It still couldn't be sent. See the note on it."))
         return redirect(url_for("admin_emails"))
+
+    # ------------------------------------------------------------ visitor counts (Nov 27, 2026)
+    # Our own quiet counter: no outside script, no cookies. A "visitor" is one device on one farm day, kept only as a
+    # scramble that changes each day, so nobody can be followed from one day to the next. Staff and robots aren't counted.
+    COUNTED = {"home", "page", "product", "cart_view", "checkout", "pay", "order", "pass_page"}
+    ROBOTS = re.compile(r"bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|curl|wget|python|httpx|"
+                        r"go-http|java/|headless|lighthouse|monitor|uptime|render", re.I)
+    VISIT_DAYS_KEPT = 400
+
+    def visitor_id(day):
+        ip = request.remote_addr or ""
+        ua = request.headers.get("User-Agent", "")
+        return hashlib.sha256("{}|{}|{}|{}".format(app.secret_key, day, ip, ua).encode()).hexdigest()[:16]
+
+    app.extensions["visitor_id"] = visitor_id  # for the checks
+
+    def count_visit(resp):
+        ua = request.headers.get("User-Agent", "")
+        if not ua or ROBOTS.search(ua) or is_admin():
+            return
+        if "prefetch" in (request.headers.get("Sec-Purpose", "") + request.headers.get("Purpose", "")).lower():
+            return
+        kinds = []
+        pid = None
+        if request.method == "POST" and request.endpoint == "cart_add" and resp.status_code in (200, 302, 303):
+            kinds, pid = ["cart"], request.form.get("product_id", type=int)
+        elif request.method == "GET" and request.endpoint in COUNTED and resp.status_code == 200 and resp.mimetype == "text/html":
+            kinds = ["view"] + (["checkout"] if request.endpoint == "checkout" else [])
+            pid = (request.view_args or {}).get("pid") if request.endpoint == "product" else None
+        if not kinds:
+            return
+        t = now()
+        day = t.date().isoformat()
+        who = visitor_id(day)
+        for k in kinds:
+            db().execute("INSERT INTO shop_visits(day, at, visitor, kind, product_id) VALUES (?, ?, ?, ?, ?)",
+                         (day, t.isoformat(), who, k, pid))
+        if t.minute == 0 and t.second < 30:  # now and then, let very old counts go
+            db().execute("DELETE FROM shop_visits WHERE day < ?", ((t.date() - dt.timedelta(days=VISIT_DAYS_KEPT)).isoformat(),))
+
+    @app.after_request
+    def counting(resp):
+        try:
+            count_visit(resp)
+        except Exception:  # noqa: BLE001  counting must never get in the way of a page
+            app.logger.exception("Couldn't count a visit")
+        return resp
+
+    def visit_stats():
+        t = now()
+        today = t.date()
+        spans = {"today": (today, today), "yesterday": (today - dt.timedelta(days=1),) * 2,
+                 "week": (today - dt.timedelta(days=6), today)}
+        out = {}
+        for name, (a, b) in spans.items():
+            a, b = a.isoformat(), b.isoformat()
+
+            def n(sql, *args):
+                return row(sql, *args)["n"] or 0
+            out[name] = {
+                "visitors": n("SELECT COUNT(DISTINCT day || visitor) AS n FROM shop_visits WHERE day BETWEEN ? AND ?", a, b),
+                "views": n("SELECT COUNT(*) AS n FROM shop_visits WHERE kind='view' AND day BETWEEN ? AND ?", a, b),
+                "cart": n("SELECT COUNT(DISTINCT day || visitor) AS n FROM shop_visits WHERE kind='cart' AND day BETWEEN ? AND ?", a, b),
+                "checkout": n("SELECT COUNT(DISTINCT day || visitor) AS n FROM shop_visits WHERE kind='checkout' AND day BETWEEN ? AND ?", a, b),
+                "ordered": n("SELECT COUNT(*) AS n FROM shop_orders WHERE status='paid' AND test=0 AND SUBSTR(paid_at, 1, 10) BETWEEN ? AND ?", a, b),
+            }
+        out["now"] = row("SELECT COUNT(DISTINCT visitor) AS n FROM shop_visits WHERE day=? AND at >= ?", today.isoformat(),
+                         (t - dt.timedelta(minutes=5)).isoformat())["n"] or 0
+        out["top"] = rows("""SELECT p.name, COUNT(*) AS n FROM shop_visits v JOIN shop_products p ON p.id = v.product_id
+                             WHERE v.kind='view' AND v.day=? GROUP BY p.id, p.name ORDER BY n DESC, p.name LIMIT 5""", today.isoformat())
+        first = (row("SELECT MIN(day) AS d FROM shop_visits") or {}).get("d")
+        out["since"] = "{:%b} {}, {}".format(dt.date.fromisoformat(first), int(first[8:]), first[:4]) if first else ""
+        return out
 
     @app.before_request
     def send_waiting_emails():

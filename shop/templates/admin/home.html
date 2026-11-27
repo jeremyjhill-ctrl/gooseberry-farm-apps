@@ -29,6 +29,22 @@
   <a class="stat" href="{{ url_for('admin_orders') }}" style="text-decoration:none;color:inherit"><span class="muted">To ship or hand over</span><b>{{ to_ship }}</b></a>
   <a class="stat" href="{{ url_for('admin_passes') }}" style="text-decoration:none;color:inherit"><span class="muted">Passes sold</span><b>{{ passes_sold }}</b><span class="muted">+ {{ passes_made }} made by hand</span></a>
 </div>
+<section class="card" id="visitors">
+  <div class="row between"><h2>Visitors</h2>
+    <span class="tag">On the shop right now: {{ visits.now }}</span></div>
+  <div class="scroll"><table>
+    <tr><th></th><th class="num">Today so far</th><th class="num">Yesterday</th><th class="num">Last 7 days</th></tr>
+    {% for key, label in [('visitors', 'Visitors'), ('views', 'Page views'), ('cart', 'Added to cart'), ('checkout', 'Started checkout'), ('ordered', 'Ordered')] %}
+    <tr><td>{% if key == 'visitors' %}<b>{{ label }}</b>{% else %}{{ label }}{% endif %}</td>
+      {% for span in ['today', 'yesterday', 'week'] %}<td class="num">{% if key == 'visitors' %}<b>{{ '{:,}'.format(visits[span][key]) }}</b>{% else %}{{ '{:,}'.format(visits[span][key]) }}{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+  </table></div>
+  {% if visits.top %}<p style="margin:8px 0 0"><b>Most viewed today:</b>
+    {% for t in visits.top %}{{ t.name }} ({{ t.n }}){{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}
+  <p class="muted" style="margin:8px 0 0">"Right now" means active in the last 5 minutes. A visitor is one phone or computer per day.
+    You and anyone logged in to the shop admin aren't counted, and neither are search engines and other robots. Reload to update.
+    {% if visits.since %}Counting since {{ visits.since }}.{% endif %}</p>
+</section>
 <section class="card">
   <div class="row between"><h2>Credits still owed</h2><a href="{{ url_for('admin_credits') }}">Credit types</a></div>
   <p class="muted" style="margin:0">On passes that still work: what's been sold or given and not used yet.</p>

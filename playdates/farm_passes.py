@@ -155,6 +155,15 @@ CREATE TABLE IF NOT EXISTS shop_pass_holds (
   detail TEXT NOT NULL,                -- {"credit_type_id": qty}
   created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS shop_visits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL,                   -- farm date (Missouri time)
+  at TEXT NOT NULL,
+  visitor TEXT NOT NULL,               -- a scramble of the device that changes every day (no IP kept)
+  kind TEXT NOT NULL,                  -- view | cart | checkout
+  product_id INTEGER
+);
+CREATE INDEX IF NOT EXISTS ix_shop_visits_day ON shop_visits(day);
 CREATE INDEX IF NOT EXISTS ix_shop_passes_code ON shop_passes(code);
 CREATE INDEX IF NOT EXISTS ix_shop_uses_pass ON shop_pass_uses(pass_id);
 CREATE INDEX IF NOT EXISTS ix_shop_orders_code ON shop_orders(code)
