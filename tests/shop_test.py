@@ -740,6 +740,31 @@ check("slow-save safety net is in the shop's script and the playdate pages' copy
       "taking longer than usual" in shop_js and shop_js == open(os.path.join(ROOT, "playdates", "static", "once.js")).read())
 check("shop and playdate pages load it", "/shop/static/once.js" in body(guest.get("/shop/cart")) and "once.js" in body(guest.get("/book")))
 
+check("links that stall get a note with a Try again button", "data-once-slow-link" in shop_js and "Try again" in shop_js and "window.stop()" in shop_js)
+
+# The farm's icon (Nov 26, 2026): the leaf for browser tabs, the sprig for phone home screens; Mollie keeps her own.
+icon_files = {name: open(os.path.join(ROOT, "icons", name), "rb").read() for name in ("favicon.ico", "icon.svg", "apple-touch-icon.png")}
+for path, name, kind in (("/favicon.ico", "favicon.ico", "image/x-icon"), ("/icon.svg", "icon.svg", "image/svg+xml"),
+                         ("/apple-touch-icon.png", "apple-touch-icon.png", "image/png"),
+                         ("/apple-touch-icon-precomposed.png", "apple-touch-icon.png", "image/png")):
+    r = visitor.get(path, base_url=FARM)
+    check("farm address serves " + path, r.status_code == 200 and r.data == icon_files[name] and r.headers["Content-Type"] == kind,
+          (r.status_code, r.headers.get("Content-Type")))
+check("phone icon is a real 180px PNG", icon_files["apple-touch-icon.png"][:8] == b"\x89PNG\r\n\x1a\n"
+      and int.from_bytes(icon_files["apple-touch-icon.png"][16:20], "big") == 180)
+check("tab icon is a real .ico", icon_files["favicon.ico"][:4] == b"\x00\x00\x01\x00")
+ICON_LINK = 'rel="icon" href="/favicon.ico?v=1"'
+for label, url in (("shop page", "/shop/"), ("product page", "/shop/p/{}".format(signed["id"])), ("booking page", "/book"),
+                   ("sign-in page", "/account/login"), ("shop admin sign-in", "/shop/admin/login"), ("playdate admin sign-in", "/admin/login")):
+    h = body(visitor.get(url, base_url=FARM))
+    check("the icon is on the " + label, ICON_LINK in h and 'rel="apple-touch-icon" href="/apple-touch-icon.png?v=1"' in h)
+check("the icon is on the gift card", ICON_LINK in body(c.get("/shop/admin/gift-card-sample")))
+bk = Client(wsgi.application)
+r = bk.get("/favicon.ico", base_url="https://bakery.example.test")
+check("Mollie's address doesn't get the farm icon", r.data != icon_files["favicon.ico"], r.status_code)
+r = bk.get("/account/login", base_url="https://bakery.example.test")
+check("Mollie's sign-in page doesn't link the farm icon", r.status_code == 200 and "Mollie" in body(r) and ICON_LINK not in body(r), r.status_code)
+
 summary = {"database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite", "passed": len(results) - len(failures),
            "total": len(results), "failures": failures}
 print(json.dumps(summary, indent=1))

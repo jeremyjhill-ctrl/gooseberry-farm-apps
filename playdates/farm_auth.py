@@ -310,8 +310,11 @@ def admin_bar(request, here, logins_url, account_url, logout_url, legacy=False):
 
 # ---------------------------------------------------------------- pages
 
+FARM_ICON_LINKS = '<link rel="icon" href="/favicon.ico?v=1" sizes="32x32"><link rel="icon" href="/icon.svg?v=1" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png?v=1">'  # same as the farm pages' <head>
+
 SHELL = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} · {{ brand }}</title>
+{{ icons }}
 <style>
 :root{--g:{{ color }};}
 *{box-sizing:border-box}body{margin:0;background:#F7F5EE;color:#1E2A20;font-family:Nunito,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.45}
@@ -484,8 +487,9 @@ def add_pages(app, brand="Gooseberry Bridge Farm", color="#2F5D3A", farm=True, d
                         url_for("account_logout"), legacy=legacy_admin()) if farm and (current_user(request) or legacy_admin()) else ""
         import farm_build
         build = farm_build.footer() if farm else ""  # Mollie's pages stay plain
+        icons = Markup(FARM_ICON_LINKS) if farm else ""  # and keep her own icon
         return render_template_string(SHELL, title=title, brand=brand, color=color, body=body, messages=list(messages), bar=bar,
-                                      build=build)
+                                      build=build, icons=icons)
 
     def safe_next(nxt):
         nxt = nxt or ""

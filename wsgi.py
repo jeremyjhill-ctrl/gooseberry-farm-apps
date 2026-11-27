@@ -48,11 +48,23 @@ farm_side = ProxyFix(playdates.app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 by_path = DispatcherMiddleware(farm_side, {"/bakery": bakery.wsgi_app, "/shop": shop.wsgi_app})
 
 
+# The farm's icon (Nov 26, 2026): the gooseberry leaf from the farm logo for browser tabs, and the whole sprig for a
+# phone's home screen. Served at the top of every farm address, where browsers look for them; Mollie's bakery keeps its own.
+ICONS = {"/favicon.ico": ("favicon.ico", "image/x-icon"), "/icon.svg": ("icon.svg", "image/svg+xml"),
+         "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+         "/apple-touch-icon-precomposed.png": ("apple-touch-icon.png", "image/png")}
+ICON_BYTES = {path: (open(os.path.join(ROOT, "icons", name), "rb").read(), kind) for path, (name, kind) in ICONS.items()}
+
+
 def application(environ, start_response):
     host = environ.get("HTTP_X_FORWARDED_HOST") or environ.get("HTTP_HOST", "")
     host = host.split(",")[0].split(":")[0].strip().lower()
     if host in BAKERY_HOSTS or host.startswith("bakery."):
         return bakery.wsgi_app(environ, start_response)
+    if environ.get("PATH_INFO") in ICON_BYTES and environ.get("REQUEST_METHOD") in ("GET", "HEAD"):
+        data, kind = ICON_BYTES[environ["PATH_INFO"]]
+        start_response("200 OK", [("Content-Type", kind), ("Content-Length", str(len(data))), ("Cache-Control", "public, max-age=86400")])
+        return [b"" if environ["REQUEST_METHOD"] == "HEAD" else data]
     if environ.get("PATH_INFO") in ("/bakery", "/shop"):
         start_response("301 Moved Permanently", [("Location", environ.get("SCRIPT_NAME", "") + environ["PATH_INFO"] + "/")])
         return [b""]
